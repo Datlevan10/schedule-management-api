@@ -6,8 +6,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
@@ -21,6 +23,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'profession_id',
+        'profession_level',
+        'workplace',
+        'department',
+        'work_schedule',
+        'work_habits',
+        'notification_preferences',
+        'is_active',
     ];
 
     /**
@@ -43,6 +53,27 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'work_schedule' => 'array',
+            'work_habits' => 'array',
+            'notification_preferences' => 'array',
+            'is_active' => 'boolean',
         ];
+    }
+
+    // JWT Methods
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    public function getJWTCustomClaims()
+    {
+        return [];
+    }
+
+    // Relationships
+    public function profession(): BelongsTo
+    {
+        return $this->belongsTo(Profession::class);
     }
 }
