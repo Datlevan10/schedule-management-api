@@ -33,7 +33,7 @@ Route::prefix('v1')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
         
         // User Login
-        Route::post('login', [AuthController::class, 'login']);
+        Route::post('login', [AuthController::class, 'login'])->name('login');
         
         // Password Reset Routes
         Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
