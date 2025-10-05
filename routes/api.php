@@ -9,6 +9,7 @@ use App\Http\Controllers\ScheduleTemplateController;
 use App\Http\Controllers\ScheduleTemplatesController;
 use App\Http\Controllers\UserSchedulePreferencesController;
 use App\Http\Controllers\ParsingRulesController;
+use App\Http\Controllers\Api\ScheduleImportTemplateController;
 
 // ================================================================
 // UNIFIED API v1 ROUTES - All routes under /api/v1/
@@ -197,6 +198,30 @@ Route::prefix('v1')->group(function () {
         // Bulk operations
         Route::post('bulk-activate', [ParsingRulesController::class, 'bulkActivate']);
         Route::post('bulk-deactivate', [ParsingRulesController::class, 'bulkDeactivate']);
+    });
+
+    // ================================================================
+    // SCHEDULE IMPORT TEMPLATES - /api/v1/schedule-import-templates/
+    // ================================================================
+    
+    Route::middleware('auth:api')->prefix('schedule-import-templates')->group(function () {
+        // List and filter templates
+        Route::get('/', [ScheduleImportTemplateController::class, 'index']);
+        Route::post('/', [ScheduleImportTemplateController::class, 'store']);
+        Route::get('{scheduleImportTemplate}', [ScheduleImportTemplateController::class, 'show']);
+        Route::put('{scheduleImportTemplate}', [ScheduleImportTemplateController::class, 'update']);
+        Route::delete('{scheduleImportTemplate}', [ScheduleImportTemplateController::class, 'destroy']);
+        
+        // Download endpoints
+        Route::get('{scheduleImportTemplate}/download', [ScheduleImportTemplateController::class, 'download']);
+        Route::get('{scheduleImportTemplate}/download-sample', [ScheduleImportTemplateController::class, 'downloadSample']);
+        Route::get('{scheduleImportTemplate}/download-instructions', [ScheduleImportTemplateController::class, 'downloadInstructions']);
+        
+        // Profession-specific templates
+        Route::get('profession/{professionId}', [ScheduleImportTemplateController::class, 'getByProfession']);
+        
+        // Update statistics
+        Route::post('{scheduleImportTemplate}/statistics', [ScheduleImportTemplateController::class, 'updateStatistics']);
     });
 
     // ================================================================
