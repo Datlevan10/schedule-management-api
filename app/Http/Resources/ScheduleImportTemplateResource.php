@@ -20,13 +20,10 @@ class ScheduleImportTemplateResource extends JsonResource
             'template_name' => $this->template_name,
             'template_description' => $this->template_description,
             'file_type' => $this->file_type,
-            'template_version' => $this->template_version,
             
             'sample_data' => [
                 'title' => $this->sample_title,
                 'description' => $this->sample_description,
-                'start_datetime' => $this->sample_start_datetime,
-                'end_datetime' => $this->sample_end_datetime,
                 'location' => $this->sample_location,
                 'priority' => $this->sample_priority,
                 'category' => $this->sample_category,
@@ -34,8 +31,6 @@ class ScheduleImportTemplateResource extends JsonResource
             ],
             
             'format_specifications' => [
-                'date_format_example' => $this->date_format_example,
-                'time_format_example' => $this->time_format_example,
                 'required_columns' => $this->required_columns,
                 'optional_columns' => $this->optional_columns,
                 'column_descriptions' => $this->column_descriptions,

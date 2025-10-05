@@ -16,17 +16,12 @@ class ScheduleImportTemplate extends Model
         'template_name',
         'template_description',
         'file_type',
-        'template_version',
         'sample_title',
         'sample_description',
-        'sample_start_datetime',
-        'sample_end_datetime',
         'sample_location',
         'sample_priority',
         'sample_category',
         'sample_keywords',
-        'date_format_example',
-        'time_format_example',
         'required_columns',
         'optional_columns',
         'column_descriptions',
@@ -48,11 +43,12 @@ class ScheduleImportTemplate extends Model
         'required_columns' => 'array',
         'optional_columns' => 'array',
         'column_descriptions' => 'array',
+        'sample_keywords' => 'array',
         'ai_keywords_examples' => 'array',
         'priority_detection_rules' => 'array',
         'category_mapping_examples' => 'array',
         'success_import_rate' => 'decimal:2',
-        'user_feedback_rating' => 'decimal:1',
+        'user_feedback_rating' => 'decimal:2',
         'is_active' => 'boolean',
         'is_default' => 'boolean',
     ];
@@ -143,8 +139,6 @@ class ScheduleImportTemplate extends Model
         return [
             'title' => $this->sample_title,
             'description' => $this->sample_description,
-            'start_datetime' => $this->sample_start_datetime,
-            'end_datetime' => $this->sample_end_datetime,
             'location' => $this->sample_location,
             'priority' => $this->sample_priority,
             'category' => $this->sample_category,
@@ -185,12 +179,9 @@ class ScheduleImportTemplate extends Model
         switch ($this->file_type) {
             case 'csv':
                 return $this->generateCsvTemplate();
-            case 'json':
-                return $this->generateJsonTemplate();
-            case 'txt':
-                return $this->generateTextTemplate();
-            case 'excel':
-                return $this->generateExcelTemplate();
+            case 'xlsx':
+            case 'xls':
+                return $this->generateCsvTemplate(); // Placeholder for Excel
             default:
                 return '';
         }
@@ -213,53 +204,6 @@ class ScheduleImportTemplate extends Model
         return $header . "\n" . implode(',', $sampleRow);
     }
 
-    /**
-     * Generate JSON template
-     */
-    protected function generateJsonTemplate(): string
-    {
-        $sampleData = [];
-        foreach ($this->all_columns as $column) {
-            $sampleData[$column] = $this->getSampleValueForColumn($column);
-        }
-        
-        return json_encode([$sampleData], JSON_PRETTY_PRINT);
-    }
-
-    /**
-     * Generate text template
-     */
-    protected function generateTextTemplate(): string
-    {
-        $lines = [];
-        $lines[] = "# Schedule Import Template - Text Format";
-        $lines[] = "# Each line represents one event";
-        $lines[] = "# Format: Title | Description | Start Date | End Date | Location | Priority";
-        $lines[] = "";
-        
-        $sampleLine = implode(' | ', [
-            $this->sample_title ?? 'Sample Event Title',
-            $this->sample_description ?? 'Sample description',
-            $this->sample_start_datetime ?? '2024-01-15 09:00',
-            $this->sample_end_datetime ?? '2024-01-15 10:00',
-            $this->sample_location ?? 'Conference Room A',
-            $this->sample_priority ?? 'High'
-        ]);
-        
-        $lines[] = $sampleLine;
-        
-        return implode("\n", $lines);
-    }
-
-    /**
-     * Generate Excel template (placeholder)
-     */
-    protected function generateExcelTemplate(): string
-    {
-        // For Excel, we'd use a library like PhpSpreadsheet
-        // For now, return CSV format
-        return $this->generateCsvTemplate();
-    }
 
     /**
      * Get sample value for a column
@@ -269,8 +213,9 @@ class ScheduleImportTemplate extends Model
         $mapping = [
             'title' => $this->sample_title ?? 'Sample Event Title',
             'description' => $this->sample_description ?? 'Sample event description',
-            'start_datetime' => $this->sample_start_datetime ?? '2024-01-15 09:00:00',
-            'end_datetime' => $this->sample_end_datetime ?? '2024-01-15 10:00:00',
+            'date' => '2024-01-15',
+            'start_time' => '09:00:00',
+            'end_time' => '10:00:00',
             'location' => $this->sample_location ?? 'Conference Room A',
             'priority' => $this->sample_priority ?? 'High',
             'category' => $this->sample_category ?? 'Meeting',
@@ -295,20 +240,6 @@ class ScheduleImportTemplate extends Model
         
         $instructions[] = "## File Format";
         $instructions[] = "- File Type: " . strtoupper($this->file_type);
-        $instructions[] = "- Version: {$this->template_version}";
-        $instructions[] = "";
-        
-        if ($this->date_format_example) {
-            $instructions[] = "## Date Format";
-            $instructions[] = "Use format: {$this->date_format_example}";
-            $instructions[] = "";
-        }
-        
-        if ($this->time_format_example) {
-            $instructions[] = "## Time Format";
-            $instructions[] = "Use format: {$this->time_format_example}";
-            $instructions[] = "";
-        }
         
         if ($this->required_columns) {
             $instructions[] = "## Required Columns";
