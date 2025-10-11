@@ -10,6 +10,7 @@ use App\Http\Controllers\ScheduleTemplatesController;
 use App\Http\Controllers\UserSchedulePreferencesController;
 use App\Http\Controllers\ParsingRulesController;
 use App\Http\Controllers\Api\ScheduleImportTemplateController;
+use App\Http\Controllers\WelcomeScreenController;
 
 // ================================================================
 // UNIFIED API v1 ROUTES - All routes under /api/v1/
@@ -222,6 +223,21 @@ Route::prefix('v1')->group(function () {
         
         // Update statistics
         Route::post('{scheduleImportTemplate}/statistics', [ScheduleImportTemplateController::class, 'updateStatistics']);
+    });
+
+    // ================================================================
+    // WELCOME SCREENS - /api/v1/welcome-screen
+    // ================================================================
+    
+    Route::get('welcome-screen', [WelcomeScreenController::class, 'getActiveScreen']);
+    
+    Route::middleware('auth:api')->prefix('welcome-screens')->group(function () {
+        Route::get('/', [WelcomeScreenController::class, 'index']);
+        Route::post('/', [WelcomeScreenController::class, 'store']);
+        Route::get('{welcomeScreen}', [WelcomeScreenController::class, 'show']);
+        Route::put('{welcomeScreen}', [WelcomeScreenController::class, 'update']);
+        Route::delete('{welcomeScreen}', [WelcomeScreenController::class, 'destroy']);
+        Route::post('{welcomeScreen}/activate', [WelcomeScreenController::class, 'activate']);
     });
 
     // ================================================================
