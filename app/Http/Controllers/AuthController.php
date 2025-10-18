@@ -143,7 +143,9 @@ class AuthController extends Controller
             JWTAuth::invalidate(JWTAuth::getToken());
 
             // Clear remember token
-            if ($user = Auth::user()) {
+            /** @var \App\Models\User|null $user */
+            $user = Auth::user();
+            if ($user) {
                 $user->update(['remember_token' => null]);
             }
 
@@ -196,6 +198,7 @@ class AuthController extends Controller
     public function me(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $user->load('profession');
 
@@ -220,6 +223,7 @@ class AuthController extends Controller
     public function updateProfile(UpdateProfileRequest $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             $updateData = $request->only([
@@ -253,6 +257,7 @@ class AuthController extends Controller
     public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             // Verify current password
@@ -366,6 +371,7 @@ class AuthController extends Controller
     public function deactivateAccount(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $user->update(['is_active' => false]);
 
@@ -434,6 +440,7 @@ class AuthController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             // Implement your verification logic here
@@ -464,6 +471,7 @@ class AuthController extends Controller
     public function resendVerificationEmail(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             if ($user->email_verified_at) {
@@ -497,6 +505,7 @@ class AuthController extends Controller
     public function deleteAccount(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             // Soft delete - deactivate instead of hard delete

@@ -27,6 +27,7 @@ class ScheduleTemplatesController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ScheduleTemplate::with(['profession', 'creator']);
 
@@ -101,6 +102,7 @@ class ScheduleTemplatesController extends Controller
     public function store(ScheduleTemplateRequest $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             $template = ScheduleTemplate::create([
@@ -143,6 +145,7 @@ class ScheduleTemplatesController extends Controller
     public function show($id): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ScheduleTemplate::with(['profession', 'creator']);
 
@@ -180,6 +183,7 @@ class ScheduleTemplatesController extends Controller
     public function update(ScheduleTemplateRequest $request, $id): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $template = ScheduleTemplate::findOrFail($id);
 
@@ -230,6 +234,7 @@ class ScheduleTemplatesController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $template = ScheduleTemplate::findOrFail($id);
 
@@ -337,6 +342,7 @@ class ScheduleTemplatesController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $originalTemplate = ScheduleTemplate::findOrFail($id);
 

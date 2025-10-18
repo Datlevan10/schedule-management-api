@@ -10,6 +10,7 @@ use App\Models\ScheduleImportTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -58,7 +59,7 @@ class ScheduleImportTemplateController extends Controller
     public function store(StoreScheduleImportTemplateRequest $request): ScheduleImportTemplateResource
     {
         $data = $request->validated();
-        $data['created_by'] = auth()->id();
+        $data['created_by'] = Auth::id();
 
         // If this is set as default, unset other defaults for the same profession
         if ($request->boolean('is_default')) {

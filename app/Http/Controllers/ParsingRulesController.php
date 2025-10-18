@@ -18,6 +18,8 @@ class ParsingRulesController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ParsingRule::with(['profession', 'creator']);
 
@@ -89,6 +91,7 @@ class ParsingRulesController extends Controller
     public function store(ParsingRuleRequest $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             $rule = ParsingRule::create([
@@ -126,6 +129,7 @@ class ParsingRulesController extends Controller
     public function show($id): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ParsingRule::with(['profession', 'creator']);
 
@@ -160,6 +164,7 @@ class ParsingRulesController extends Controller
     public function update(ParsingRuleRequest $request, $id): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $rule = ParsingRule::findOrFail($id);
 
@@ -205,6 +210,7 @@ class ParsingRulesController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $rule = ParsingRule::findOrFail($id);
 
@@ -242,6 +248,7 @@ class ParsingRulesController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ParsingRule::query();
 
@@ -378,6 +385,7 @@ class ParsingRulesController extends Controller
     public function byProfession($professionId): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             // Check access permissions
@@ -423,6 +431,7 @@ class ParsingRulesController extends Controller
         }
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ParsingRule::active()
                 ->ofType($type)
@@ -464,6 +473,7 @@ class ParsingRulesController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $ruleIds = $request->rule_ids;
 
@@ -505,6 +515,7 @@ class ParsingRulesController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $ruleIds = $request->rule_ids;
 
