@@ -40,14 +40,28 @@ class WelcomeScreenController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Handle file upload for background_value when background_type is image or video
+        $backgroundValue = $request->background_value;
+        
+        if ($request->hasFile('background_value') && in_array($request->background_type, ['image', 'video'])) {
+            $file = $request->file('background_value');
+            $path = $file->store('welcome-screens', 'public');
+            $backgroundValue = $path;
+        }
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'subtitle' => 'nullable|string|max:255',
             'background_type' => ['required', Rule::in(['color', 'image', 'video'])],
-            'background_value' => 'required|string',
+            'background_value' => $request->hasFile('background_value') ? 'required|file|mimes:jpeg,png,jpg,gif,mp4,webm,ogg|max:10240' : 'required|string',
             'duration' => 'required|integer|min:1|max:60',
             'is_active' => 'boolean'
         ]);
+
+        // Override background_value with file path if file was uploaded
+        if ($request->hasFile('background_value')) {
+            $validated['background_value'] = $backgroundValue;
+        }
 
         $screen = WelcomeScreen::create($validated);
 
@@ -72,14 +86,28 @@ class WelcomeScreenController extends Controller
 
     public function update(Request $request, WelcomeScreen $welcomeScreen): JsonResponse
     {
+        // Handle file upload for background_value when background_type is image or video
+        $backgroundValue = $request->background_value;
+        
+        if ($request->hasFile('background_value') && in_array($request->background_type, ['image', 'video'])) {
+            $file = $request->file('background_value');
+            $path = $file->store('welcome-screens', 'public');
+            $backgroundValue = $path;
+        }
+
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'subtitle' => 'nullable|string|max:255',
             'background_type' => ['sometimes', 'required', Rule::in(['color', 'image', 'video'])],
-            'background_value' => 'sometimes|required|string',
+            'background_value' => $request->hasFile('background_value') ? 'sometimes|required|file|mimes:jpeg,png,jpg,gif,mp4,webm,ogg|max:10240' : 'sometimes|required|string',
             'duration' => 'sometimes|required|integer|min:1|max:60',
             'is_active' => 'sometimes|boolean'
         ]);
+
+        // Override background_value with file path if file was uploaded
+        if ($request->hasFile('background_value')) {
+            $validated['background_value'] = $backgroundValue;
+        }
 
         $welcomeScreen->update($validated);
 

@@ -11,16 +11,10 @@ use App\Http\Controllers\UserSchedulePreferencesController;
 use App\Http\Controllers\ParsingRulesController;
 use App\Http\Controllers\Api\ScheduleImportTemplateController;
 use App\Http\Controllers\WelcomeScreenController;
-
-// ================================================================
-// UNIFIED API v1 ROUTES - All routes under /api/v1/
-// ================================================================
+use App\Http\Controllers\ProfessionController;
 
 Route::prefix('v1')->group(function () {
-    
-    // ================================================================
-    // HEALTH CHECK
-    // ================================================================
+
     Route::get('health', function () {
         return response()->json([
             'status' => 'OK',
@@ -30,26 +24,33 @@ Route::prefix('v1')->group(function () {
         ]);
     });
 
-    // ================================================================
-    // AUTHENTICATION ROUTES - /api/v1/auth/
-    // ================================================================
-    
+    // Public profession endpoints (for registration)
+    Route::get('professions', [ProfessionController::class, 'index']);
+    Route::get('professions/{id}', [ProfessionController::class, 'show']);
+
+    // Admin-protected profession management
+    Route::middleware('auth:api')->prefix('professions')->group(function () {
+        Route::post('/', [ProfessionController::class, 'store']);
+        Route::put('{id}', [ProfessionController::class, 'update']);
+        Route::delete('{id}', [ProfessionController::class, 'destroy']);
+    });
+
     // Public authentication routes (no middleware required)
     Route::prefix('auth')->group(function () {
         // User Registration
         Route::post('register', [AuthController::class, 'register']);
-        
+
         // User Login
         Route::post('login', [AuthController::class, 'login'])->name('login');
-        
+
         // Password Reset Routes
         Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
         Route::post('reset-password', [AuthController::class, 'resetPassword']);
-        
+
         // Email Verification
         Route::post('email/verify', [AuthController::class, 'verifyEmail']);
         Route::post('email/resend', [AuthController::class, 'resendVerificationEmail']);
-        
+
         // Account Reactivation (for deactivated accounts)
         Route::post('reactivate', [AuthController::class, 'reactivateAccount']);
     });
@@ -58,28 +59,24 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:api')->prefix('auth')->group(function () {
         // User Logout
         Route::post('logout', [AuthController::class, 'logout']);
-        
+
         // Token Refresh
         Route::post('refresh', [AuthController::class, 'refresh']);
-        
+
         // Get Current User Profile
         Route::get('me', [AuthController::class, 'me']);
-        
+
         // Update Profile
         Route::put('profile', [AuthController::class, 'updateProfile']);
-        
+
         // Change Password
         Route::post('change-password', [AuthController::class, 'changePassword']);
-        
+
         // Account Management
         Route::post('deactivate', [AuthController::class, 'deactivateAccount']);
         Route::delete('delete', [AuthController::class, 'deleteAccount']);
     });
 
-    // ================================================================
-    // EVENT ROUTES - /api/v1/events/
-    // ================================================================
-    
     Route::prefix('events')->group(function () {
         // GET endpoints
         Route::get('/', [EventController::class, 'index']);
@@ -88,22 +85,18 @@ Route::prefix('v1')->group(function () {
         Route::get('by-status', [EventController::class, 'getByStatus']);
         Route::get('search', [EventController::class, 'search']);
         Route::get('{event}', [EventController::class, 'show']);
-        
+
         // POST endpoints
         Route::post('/', [EventController::class, 'store']);
-        
+
         // PUT/PATCH endpoints
         Route::put('{event}', [EventController::class, 'update']);
         Route::patch('{event}', [EventController::class, 'update']);
-        
+
         // DELETE endpoints
         Route::delete('{event}', [EventController::class, 'destroy']);
     });
 
-    // ================================================================
-    // SCHEDULE IMPORT ROUTES - /api/v1/schedule-imports/
-    // ================================================================
-    
     Route::middleware('auth:api')->prefix('schedule-imports')->group(function () {
         // Import management
         Route::get('/', [ScheduleImportController::class, 'index']);
@@ -111,20 +104,16 @@ Route::prefix('v1')->group(function () {
         Route::get('statistics', [ScheduleImportController::class, 'statistics']);
         Route::get('{id}', [ScheduleImportController::class, 'show']);
         Route::delete('{id}', [ScheduleImportController::class, 'destroy']);
-        
+
         // Import processing
         Route::post('{id}/process', [ScheduleImportController::class, 'process']);
         Route::post('{id}/convert', [ScheduleImportController::class, 'convert']);
-        
+
         // Import entries
         Route::get('{id}/entries', [ScheduleImportController::class, 'entries']);
         Route::patch('entries/{id}', [ScheduleImportController::class, 'updateEntry']);
     });
 
-    // ================================================================
-    // SCHEDULE TEMPLATES (IMPORT) - /api/v1/schedule-templates/
-    // ================================================================
-    
     Route::middleware('auth:api')->prefix('schedule-templates')->group(function () {
         // Template browsing and download
         Route::get('/', [ScheduleTemplateController::class, 'index']);
@@ -133,20 +122,16 @@ Route::prefix('v1')->group(function () {
         Route::get('defaults', [ScheduleTemplateController::class, 'defaultTemplates']);
         Route::get('my-profession', [ScheduleTemplateController::class, 'myProfessionTemplates']);
         Route::get('{id}', [ScheduleTemplateController::class, 'show']);
-        
+
         // Template downloads and previews
         Route::get('{id}/download', [ScheduleTemplateController::class, 'download']);
         Route::get('{id}/preview', [ScheduleTemplateController::class, 'preview']);
         Route::post('{id}/rate', [ScheduleTemplateController::class, 'rate']);
-        
+
         // Admin only - template file generation
         Route::post('{id}/generate', [ScheduleTemplateController::class, 'generateFiles']);
     });
 
-    // ================================================================
-    // SCHEDULE TEMPLATES (CRUD) - /api/v1/templates/
-    // ================================================================
-    
     Route::middleware('auth:api')->prefix('templates')->group(function () {
         // CRUD operations for schedule templates
         Route::get('/', [ScheduleTemplatesController::class, 'index']);
@@ -154,23 +139,19 @@ Route::prefix('v1')->group(function () {
         Route::get('{id}', [ScheduleTemplatesController::class, 'show']);
         Route::put('{id}', [ScheduleTemplatesController::class, 'update']);
         Route::delete('{id}', [ScheduleTemplatesController::class, 'destroy']);
-        
+
         // Template field mapping validation
         Route::post('validate-mapping', [ScheduleTemplatesController::class, 'validateMapping']);
         Route::post('{id}/duplicate', [ScheduleTemplatesController::class, 'duplicate']);
     });
 
-    // ================================================================
-    // USER SCHEDULE PREFERENCES - /api/v1/preferences/
-    // ================================================================
-    
     Route::middleware('auth:api')->prefix('preferences')->group(function () {
         // User preferences management
         Route::get('/', [UserSchedulePreferencesController::class, 'show']);
         Route::post('/', [UserSchedulePreferencesController::class, 'store']);
         Route::put('/', [UserSchedulePreferencesController::class, 'update']);
         Route::delete('/', [UserSchedulePreferencesController::class, 'destroy']);
-        
+
         // Preference components
         Route::post('keywords', [UserSchedulePreferencesController::class, 'addKeyword']);
         Route::delete('keywords/{keyword}', [UserSchedulePreferencesController::class, 'removeKeyword']);
@@ -178,10 +159,6 @@ Route::prefix('v1')->group(function () {
         Route::get('defaults', [UserSchedulePreferencesController::class, 'getDefaults']);
     });
 
-    // ================================================================
-    // PARSING RULES - /api/v1/parsing-rules/
-    // ================================================================
-    
     Route::middleware('auth:api')->prefix('parsing-rules')->group(function () {
         // CRUD operations for parsing rules
         Route::get('/', [ParsingRulesController::class, 'index']);
@@ -189,22 +166,18 @@ Route::prefix('v1')->group(function () {
         Route::get('{id}', [ParsingRulesController::class, 'show']);
         Route::put('{id}', [ParsingRulesController::class, 'update']);
         Route::delete('{id}', [ParsingRulesController::class, 'destroy']);
-        
+
         // Rule testing and validation
         Route::post('{id}/test', [ParsingRulesController::class, 'testRule']);
         Route::post('validate-pattern', [ParsingRulesController::class, 'validatePattern']);
         Route::get('by-profession/{professionId}', [ParsingRulesController::class, 'byProfession']);
         Route::get('by-type/{type}', [ParsingRulesController::class, 'byType']);
-        
+
         // Bulk operations
         Route::post('bulk-activate', [ParsingRulesController::class, 'bulkActivate']);
         Route::post('bulk-deactivate', [ParsingRulesController::class, 'bulkDeactivate']);
     });
 
-    // ================================================================
-    // SCHEDULE IMPORT TEMPLATES - /api/v1/schedule-import-templates/
-    // ================================================================
-    
     Route::middleware('auth:api')->prefix('schedule-import-templates')->group(function () {
         // List and filter templates
         Route::get('/', [ScheduleImportTemplateController::class, 'index']);
@@ -212,36 +185,29 @@ Route::prefix('v1')->group(function () {
         Route::get('{scheduleImportTemplate}', [ScheduleImportTemplateController::class, 'show']);
         Route::put('{scheduleImportTemplate}', [ScheduleImportTemplateController::class, 'update']);
         Route::delete('{scheduleImportTemplate}', [ScheduleImportTemplateController::class, 'destroy']);
-        
+
         // Download endpoints
         Route::get('{scheduleImportTemplate}/download', [ScheduleImportTemplateController::class, 'download']);
         Route::get('{scheduleImportTemplate}/download-sample', [ScheduleImportTemplateController::class, 'downloadSample']);
         Route::get('{scheduleImportTemplate}/download-instructions', [ScheduleImportTemplateController::class, 'downloadInstructions']);
-        
+
         // Profession-specific templates
         Route::get('profession/{professionId}', [ScheduleImportTemplateController::class, 'getByProfession']);
-        
+
         // Update statistics
         Route::post('{scheduleImportTemplate}/statistics', [ScheduleImportTemplateController::class, 'updateStatistics']);
     });
 
-    // ================================================================
-    // WELCOME SCREENS - /api/v1/welcome-screen
-    // ================================================================
-    
+    // Public welcome screen routes (no authentication required)
     Route::get('welcome-screen', [WelcomeScreenController::class, 'getActiveScreen']);
-    
+    Route::post('welcome-screens', [WelcomeScreenController::class, 'store']);
+
+    // Admin welcome screen routes (authentication required)
     Route::middleware('auth:api')->prefix('welcome-screens')->group(function () {
         Route::get('/', [WelcomeScreenController::class, 'index']);
-        Route::post('/', [WelcomeScreenController::class, 'store']);
         Route::get('{welcomeScreen}', [WelcomeScreenController::class, 'show']);
         Route::put('{welcomeScreen}', [WelcomeScreenController::class, 'update']);
         Route::delete('{welcomeScreen}', [WelcomeScreenController::class, 'destroy']);
         Route::post('{welcomeScreen}/activate', [WelcomeScreenController::class, 'activate']);
     });
-
-    // ================================================================
-    // FUTURE API ENDPOINTS CAN BE ADDED HERE
-    // ================================================================
-    
 });

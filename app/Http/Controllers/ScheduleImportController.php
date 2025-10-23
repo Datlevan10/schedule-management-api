@@ -98,6 +98,7 @@ class ScheduleImportController extends Controller
 
         DB::beginTransaction();
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
 

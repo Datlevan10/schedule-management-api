@@ -27,6 +27,7 @@ class ScheduleTemplateController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $query = ScheduleImportTemplate::active()
                 ->with(['profession', 'creator']);
@@ -256,6 +257,7 @@ class ScheduleTemplateController extends Controller
     public function myProfessionTemplates(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             if (!$user->profession_id) {
@@ -292,6 +294,7 @@ class ScheduleTemplateController extends Controller
     public function defaultTemplates(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             $query = ScheduleImportTemplate::active()
@@ -331,7 +334,9 @@ class ScheduleTemplateController extends Controller
     {
         try {
             // Check admin permission
-            if (!Auth::user()->isAdmin()) {
+            /** @var \App\Models\User $adminUser */
+            $adminUser = Auth::user();
+            if (!$adminUser->isAdmin()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized'
@@ -364,6 +369,7 @@ class ScheduleTemplateController extends Controller
     public function statistics(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             $query = ScheduleImportTemplate::active();
@@ -412,6 +418,7 @@ class ScheduleTemplateController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $searchQuery = $request->get('query');
             

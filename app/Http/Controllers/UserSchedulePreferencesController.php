@@ -18,6 +18,7 @@ class UserSchedulePreferencesController extends Controller
     public function show(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
             
@@ -44,6 +45,7 @@ class UserSchedulePreferencesController extends Controller
     public function store(UserSchedulePreferencesRequest $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             
             // Check if preferences already exist
@@ -95,6 +97,7 @@ class UserSchedulePreferencesController extends Controller
     public function update(UserSchedulePreferencesRequest $request): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
 
@@ -137,6 +140,7 @@ class UserSchedulePreferencesController extends Controller
     public function destroy(): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::where('user_id', $user->id)->first();
             
@@ -168,6 +172,7 @@ class UserSchedulePreferencesController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
             
@@ -196,6 +201,7 @@ class UserSchedulePreferencesController extends Controller
     public function removeKeyword($keyword): JsonResponse
     {
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
             
@@ -229,6 +235,7 @@ class UserSchedulePreferencesController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
             
