@@ -198,11 +198,13 @@ Route::prefix('v1')->group(function () {
         Route::post('{scheduleImportTemplate}/statistics', [ScheduleImportTemplateController::class, 'updateStatistics']);
     });
 
+    // Public welcome screen routes (no authentication required)
     Route::get('welcome-screen', [WelcomeScreenController::class, 'getActiveScreen']);
+    Route::post('welcome-screens', [WelcomeScreenController::class, 'store']);
 
+    // Admin welcome screen routes (authentication required)
     Route::middleware('auth:api')->prefix('welcome-screens')->group(function () {
         Route::get('/', [WelcomeScreenController::class, 'index']);
-        Route::post('/', [WelcomeScreenController::class, 'store']);
         Route::get('{welcomeScreen}', [WelcomeScreenController::class, 'show']);
         Route::put('{welcomeScreen}', [WelcomeScreenController::class, 'update']);
         Route::delete('{welcomeScreen}', [WelcomeScreenController::class, 'destroy']);

@@ -38,7 +38,9 @@ class WelcomeScreen extends Model
 
     public function activate()
     {
-        static::query()->update(['is_active' => false]);
+        // Deactivate all other screens first
+        static::query()->where('id', '!=', $this->id)->update(['is_active' => false]);
+        // Then activate this screen
         $this->update(['is_active' => true]);
     }
 }
