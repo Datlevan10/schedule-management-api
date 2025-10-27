@@ -12,6 +12,7 @@ use App\Http\Controllers\ParsingRulesController;
 use App\Http\Controllers\Api\ScheduleImportTemplateController;
 use App\Http\Controllers\WelcomeScreenController;
 use App\Http\Controllers\ProfessionController;
+use App\Http\Controllers\Api\FeatureHighlightController;
 
 Route::prefix('v1')->group(function () {
 
@@ -198,9 +199,21 @@ Route::prefix('v1')->group(function () {
         Route::post('{scheduleImportTemplate}/statistics', [ScheduleImportTemplateController::class, 'updateStatistics']);
     });
 
+    // Public feature highlights (no authentication required)
+    Route::get('feature-highlights', [FeatureHighlightController::class, 'index']);
+
     // Public welcome screen routes (no authentication required)
     Route::get('welcome-screen', [WelcomeScreenController::class, 'getActiveScreen']);
     Route::post('welcome-screens', [WelcomeScreenController::class, 'store']);
+
+    // Admin feature highlights routes (authentication required)
+    Route::middleware('auth:api')->prefix('feature-highlights')->group(function () {
+        Route::post('/', [FeatureHighlightController::class, 'store']);
+        Route::get('{featureHighlight}', [FeatureHighlightController::class, 'show']);
+        Route::put('{featureHighlight}', [FeatureHighlightController::class, 'update']);
+        Route::patch('{featureHighlight}', [FeatureHighlightController::class, 'update']);
+        Route::delete('{featureHighlight}', [FeatureHighlightController::class, 'destroy']);
+    });
 
     // Admin welcome screen routes (authentication required)
     Route::middleware('auth:api')->prefix('welcome-screens')->group(function () {
