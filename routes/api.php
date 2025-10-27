@@ -201,6 +201,7 @@ Route::prefix('v1')->group(function () {
 
     // Public feature highlights (no authentication required)
     Route::get('feature-highlights', [FeatureHighlightController::class, 'index']);
+    Route::get('feature-highlights/{featureHighlight}', [FeatureHighlightController::class, 'show']);
 
     // Public welcome screen routes (no authentication required)
     Route::get('welcome-screen', [WelcomeScreenController::class, 'getActiveScreen']);
@@ -209,7 +210,6 @@ Route::prefix('v1')->group(function () {
     // Admin feature highlights routes (authentication required)
     Route::middleware('auth:api')->prefix('feature-highlights')->group(function () {
         Route::post('/', [FeatureHighlightController::class, 'store']);
-        Route::get('{featureHighlight}', [FeatureHighlightController::class, 'show']);
         Route::put('{featureHighlight}', [FeatureHighlightController::class, 'update']);
         Route::patch('{featureHighlight}', [FeatureHighlightController::class, 'update']);
         Route::delete('{featureHighlight}', [FeatureHighlightController::class, 'destroy']);

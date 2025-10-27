@@ -27,8 +27,35 @@ class UpdateFeatureHighlightRequest extends FormRequest
             'icon_file' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
             'icon_url' => 'nullable|string|url|max:255',
             'order' => 'sometimes|required|integer|min:1',
-            'is_active' => 'boolean',
+            'is_active' => 'nullable|boolean',
         ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation()
+    {
+        $this->merge([
+            'is_active' => $this->toBoolean($this->is_active),
+            'order' => $this->input('order') ? (int) $this->input('order') : null,
+        ]);
+    }
+
+    /**
+     * Convert string to boolean for validation
+     */
+    private function toBoolean($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        
+        if (is_bool($value)) {
+            return $value;
+        }
+        
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
     }
 
     public function messages(): array
