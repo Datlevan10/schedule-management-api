@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ScheduleImportTemplateController;
 use App\Http\Controllers\WelcomeScreenController;
 use App\Http\Controllers\ProfessionController;
 use App\Http\Controllers\Api\FeatureHighlightController;
+use App\Http\Controllers\UserController;
 
 Route::prefix('v1')->group(function () {
 
@@ -76,6 +77,11 @@ Route::prefix('v1')->group(function () {
         // Account Management
         Route::post('deactivate', [AuthController::class, 'deactivateAccount']);
         Route::delete('delete', [AuthController::class, 'deleteAccount']);
+    });
+
+    // User management routes (require authentication)
+    Route::middleware('auth:api')->prefix('users')->group(function () {
+        Route::get('{id}', [UserController::class, 'show']);
     });
 
     Route::prefix('events')->group(function () {
