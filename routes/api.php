@@ -14,6 +14,7 @@ use App\Http\Controllers\WelcomeScreenController;
 use App\Http\Controllers\ProfessionController;
 use App\Http\Controllers\Api\FeatureHighlightController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Api\AdminCustomerReportingTemplateController;
 
 Route::prefix('v1')->group(function () {
 
@@ -228,5 +229,23 @@ Route::prefix('v1')->group(function () {
         Route::put('{welcomeScreen}', [WelcomeScreenController::class, 'update']);
         Route::delete('{welcomeScreen}', [WelcomeScreenController::class, 'destroy']);
         Route::post('{welcomeScreen}/activate', [WelcomeScreenController::class, 'activate']);
+    });
+
+    // Admin customer reporting templates (authentication required)
+    Route::middleware('auth:api')->prefix('admin/customer-reporting-templates')->group(function () {
+        // CRUD operations
+        Route::get('/', [AdminCustomerReportingTemplateController::class, 'index']);
+        Route::post('/', [AdminCustomerReportingTemplateController::class, 'store']);
+        Route::get('{id}', [AdminCustomerReportingTemplateController::class, 'show']);
+        Route::put('{id}', [AdminCustomerReportingTemplateController::class, 'update']);
+        Route::delete('{id}', [AdminCustomerReportingTemplateController::class, 'destroy']);
+        
+        // Additional operations
+        Route::post('{id}/generate-report', [AdminCustomerReportingTemplateController::class, 'generateReport']);
+        Route::post('{id}/clone', [AdminCustomerReportingTemplateController::class, 'cloneTemplate']);
+        Route::patch('{id}/toggle-active', [AdminCustomerReportingTemplateController::class, 'toggleActive']);
+        
+        // Statistics and utilities
+        Route::get('stats/customers', [AdminCustomerReportingTemplateController::class, 'getCustomerStats']);
     });
 });
