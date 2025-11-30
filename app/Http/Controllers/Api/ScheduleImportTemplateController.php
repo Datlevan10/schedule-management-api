@@ -13,6 +13,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ScheduleImportTemplateController extends Controller
 {
@@ -133,7 +134,7 @@ class ScheduleImportTemplateController extends Controller
     /**
      * Download template file
      */
-    public function download(ScheduleImportTemplate $scheduleImportTemplate): BinaryFileResponse|JsonResponse
+    public function download(Request $request, ScheduleImportTemplate $scheduleImportTemplate): BinaryFileResponse|StreamedResponse|JsonResponse
     {
         // Check if file actually exists, generate if not
         $filePath = $scheduleImportTemplate->template_file_path 
@@ -157,38 +158,90 @@ class ScheduleImportTemplateController extends Controller
         $scheduleImportTemplate->incrementDownloadCount();
 
         $fileName = $scheduleImportTemplate->template_name . '.' . $scheduleImportTemplate->file_type;
+        $fileContent = file_get_contents($filePath);
 
-        return response()->download($filePath, $fileName);
+        // Check if request wants JSON response (for mobile apps)
+        if ($request->has('format') && $request->format === 'json') {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'filename' => $fileName,
+                    'content' => $fileContent,
+                    'content_base64' => base64_encode($fileContent),
+                    'mime_type' => 'text/csv',
+                    'size' => strlen($fileContent)
+                ]
+            ]);
+        }
+
+        // For direct download (browser/Postman)
+        return response()->streamDownload(function () use ($fileContent) {
+            echo $fileContent;
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Access-Control-Expose-Headers' => 'Content-Disposition'
+        ]);
     }
 
     /**
      * Download sample data file
      */
-    public function downloadSample(ScheduleImportTemplate $scheduleImportTemplate): BinaryFileResponse|JsonResponse
+    public function downloadSample(Request $request, ScheduleImportTemplate $scheduleImportTemplate): StreamedResponse|JsonResponse
     {
+        // Check if file path exists, generate if not
         if (!$scheduleImportTemplate->sample_data_file_path) {
-            return response()->json([
-                'message' => 'Sample data file not found'
-            ], 404);
+            // Generate template files including sample data
+            $this->generateTemplateFiles($scheduleImportTemplate);
+            $scheduleImportTemplate->refresh();
         }
 
         $filePath = storage_path('app/public/' . $scheduleImportTemplate->sample_data_file_path);
 
         if (!file_exists($filePath)) {
-            return response()->json([
-                'message' => 'Sample data file not found'
-            ], 404);
+            // Try to generate again if file still doesn't exist
+            $this->generateTemplateFiles($scheduleImportTemplate);
+            $scheduleImportTemplate->refresh();
+            $filePath = storage_path('app/public/' . $scheduleImportTemplate->sample_data_file_path);
+            
+            if (!file_exists($filePath)) {
+                return response()->json([
+                    'message' => 'Sample data file could not be generated'
+                ], 404);
+            }
         }
 
         $fileName = $scheduleImportTemplate->template_name . '_sample.' . $scheduleImportTemplate->file_type;
+        $fileContent = file_get_contents($filePath);
 
-        return response()->download($filePath, $fileName);
+        // Check if request wants JSON response (for mobile apps)
+        if ($request->has('format') && $request->format === 'json') {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'filename' => $fileName,
+                    'content' => $fileContent,
+                    'content_base64' => base64_encode($fileContent),
+                    'mime_type' => 'text/csv',
+                    'size' => strlen($fileContent)
+                ]
+            ]);
+        }
+
+        // For direct download (browser/Postman)
+        return response()->streamDownload(function () use ($fileContent) {
+            echo $fileContent;
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Access-Control-Expose-Headers' => 'Content-Disposition'
+        ]);
     }
 
     /**
      * Download instructions file
      */
-    public function downloadInstructions(ScheduleImportTemplate $scheduleImportTemplate): BinaryFileResponse|JsonResponse
+    public function downloadInstructions(Request $request, ScheduleImportTemplate $scheduleImportTemplate): StreamedResponse|JsonResponse
     {
         if (!$scheduleImportTemplate->instructions_file_path) {
             // Generate instructions file if it doesn't exist
@@ -205,8 +258,30 @@ class ScheduleImportTemplateController extends Controller
         }
 
         $fileName = $scheduleImportTemplate->template_name . '_instructions.md';
+        $fileContent = file_get_contents($filePath);
 
-        return response()->download($filePath, $fileName);
+        // Check if request wants JSON response (for mobile apps)
+        if ($request->has('format') && $request->format === 'json') {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'filename' => $fileName,
+                    'content' => $fileContent,
+                    'content_base64' => base64_encode($fileContent),
+                    'mime_type' => 'text/markdown',
+                    'size' => strlen($fileContent)
+                ]
+            ]);
+        }
+
+        // For direct download (browser/Postman)
+        return response()->streamDownload(function () use ($fileContent) {
+            echo $fileContent;
+        }, $fileName, [
+            'Content-Type' => 'text/markdown; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Access-Control-Expose-Headers' => 'Content-Disposition'
+        ]);
     }
 
     /**
@@ -280,7 +355,26 @@ class ScheduleImportTemplateController extends Controller
      */
     protected function getSampleValueForColumn(string $column, int $index): string
     {
-        $samples = [
+        // Vietnamese column mappings
+        $vietnameseSamples = [
+            'ngay' => ['2024-01-15', '2024-01-16', '2024-01-17', '2024-01-18', '2024-01-19'],
+            'gio_bat_dau' => ['08:00', '09:00', '10:00', '14:00', '15:00'],
+            'gio_ket_thuc' => ['09:00', '10:00', '11:00', '15:00', '16:00'],
+            'gio_bat_dau_ca' => ['07:00', '08:00', '13:00', '19:00', '06:00'],
+            'gio_ket_thuc_ca' => ['12:00', '17:00', '18:00', '23:00', '14:00'],
+            'lop' => ['Lớp 10A', 'Lớp 11B', 'Lớp 12C', 'Lớp 9A', 'Lớp 8B'],
+            'mon_hoc' => ['Toán học', 'Vật lý', 'Hóa học', 'Sinh học', 'Ngữ văn'],
+            'giao_vien' => ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Phạm Thị D', 'Hoàng Văn E'],
+            'phong' => ['P.201', 'P.202', 'P.301', 'P.302', 'P.401'],
+            'ghi_chu' => ['Kiểm tra 15 phút', 'Học bù', 'Ôn tập', 'Thực hành', 'Báo cáo'],
+            'khoa' => ['Khoa Nội', 'Khoa Ngoại', 'Khoa Sản', 'Khoa Nhi', 'Khoa Tim mạch'],
+            'ma_benh_nhan' => ['BN001', 'BN002', 'BN003', 'BN004', 'BN005'],
+            'cua_hang' => ['Chi nhánh Quận 1', 'Chi nhánh Quận 2', 'Chi nhánh Quận 3', 'Chi nhánh Quận 7', 'Chi nhánh Thủ Đức'],
+            'ten_khach_hang' => ['Công ty ABC', 'Khách VIP', 'Đối tác XYZ', 'Khách lẻ', 'Đại lý 123'],
+        ];
+        
+        // English column mappings (fallback)
+        $englishSamples = [
             'date' => ['2024-01-15', '2024-01-16', '2024-01-17', '2024-01-18', '2024-01-19'],
             'subject' => ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English'],
             'title' => ['Morning Meeting', 'Project Review', 'Team Standup', 'Client Call', 'Training Session'],
@@ -304,11 +398,17 @@ class ScheduleImportTemplateController extends Controller
 
         $index = ($index - 1) % 5; // Ensure we stay within array bounds
         
-        if (isset($samples[$column])) {
-            return $samples[$column][$index];
+        // Check Vietnamese samples first
+        if (isset($vietnameseSamples[$column])) {
+            return $vietnameseSamples[$column][$index];
         }
         
-        return "Sample {$column} {$index}";
+        // Then check English samples
+        if (isset($englishSamples[$column])) {
+            return $englishSamples[$column][$index];
+        }
+        
+        return "Mẫu {$column} {$index}";
     }
 
     /**
