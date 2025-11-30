@@ -23,6 +23,7 @@ class User extends Authenticatable implements JWTSubject
         'name',
         'email',
         'password',
+        'password_changed_at',
         'profession_id',
         'profession_level',
         'workplace',
@@ -53,6 +54,7 @@ class User extends Authenticatable implements JWTSubject
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_changed_at' => 'datetime',
             'work_schedule' => 'array',
             'work_habits' => 'array',
             'notification_preferences' => 'array',

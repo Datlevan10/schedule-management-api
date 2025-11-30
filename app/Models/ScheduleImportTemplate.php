@@ -210,7 +210,26 @@ class ScheduleImportTemplate extends Model
      */
     protected function getSampleValueForColumn(string $column): string
     {
-        $mapping = [
+        // Map Vietnamese column names to sample values
+        $vietnameseMapping = [
+            'ngay' => '2024-01-15',
+            'gio_bat_dau' => '09:00',
+            'gio_ket_thuc' => '10:00',
+            'gio_bat_dau_ca' => '08:00',
+            'gio_ket_thuc_ca' => '16:00',
+            'lop' => 'Lớp 10A',
+            'mon_hoc' => 'Toán học',
+            'giao_vien' => 'Nguyễn Văn A',
+            'phong' => 'P.201',
+            'ghi_chu' => 'Ghi chú mẫu',
+            'khoa' => 'Khoa Nội',
+            'ma_benh_nhan' => 'BN001',
+            'cua_hang' => 'Chi nhánh 1',
+            'ten_khach_hang' => 'Khách hàng VIP',
+        ];
+        
+        // English mapping (fallback)
+        $englishMapping = [
             'title' => $this->sample_title ?? 'Sample Event Title',
             'description' => $this->sample_description ?? 'Sample event description',
             'date' => '2024-01-15',
@@ -222,7 +241,16 @@ class ScheduleImportTemplate extends Model
             'keywords' => $this->sample_keywords ?? 'urgent, meeting, team',
         ];
         
-        return $mapping[$column] ?? "Sample {$column}";
+        // Check Vietnamese first, then English, then default
+        if (isset($vietnameseMapping[$column])) {
+            return $vietnameseMapping[$column];
+        }
+        
+        if (isset($englishMapping[$column])) {
+            return $englishMapping[$column];
+        }
+        
+        return "Sample {$column}";
     }
 
     /**
