@@ -83,9 +83,12 @@ Route::prefix('v1')->group(function () {
     });
 
     // User management routes (require authentication)
-    Route::prefix('users')->group(function () {
+    Route::middleware('auth:api')->prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'index']); // Get all users (Admin only)
         Route::get('{id}', [UserController::class, 'show']); // Get specific user
+        Route::put('{id}', [UserController::class, 'update']); // Update user
+        Route::delete('{id}', [UserController::class, 'destroy']); // Delete user
+        Route::patch('{id}', [UserController::class, 'update']); // Update user (PATCH)
     });
 
     Route::prefix('events')->group(function () {
@@ -106,6 +109,11 @@ Route::prefix('v1')->group(function () {
 
         // DELETE endpoints
         Route::delete('{event}', [EventController::class, 'destroy']);
+    });
+
+    // Manual task creation endpoint (no authentication required)
+    Route::prefix('manual-tasks')->group(function () {
+        Route::post('/', [EventController::class, 'createManualTask']);
     });
 
     Route::middleware('auth:api')->prefix('schedule-imports')->group(function () {

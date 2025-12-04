@@ -32,6 +32,8 @@ class User extends Authenticatable implements JWTSubject
         'work_habits',
         'notification_preferences',
         'is_active',
+        'email_verified_at',
+        'deactivated_at',
     ];
 
     /**
@@ -55,10 +57,11 @@ class User extends Authenticatable implements JWTSubject
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'password_changed_at' => 'datetime',
-            'work_schedule' => 'array',
-            'work_habits' => 'array',
-            'notification_preferences' => 'array',
+            'work_schedule' => 'json',
+            'work_habits' => 'json',
+            'notification_preferences' => 'json',
             'is_active' => 'boolean',
+            'deactivated_at' => 'datetime',
         ];
     }
 
