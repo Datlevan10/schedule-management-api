@@ -206,6 +206,117 @@ class EventController extends Controller
     }
 
     /**
+     * Get all events/tasks for a specific user
+     * GET /api/v1/events/user/{userId}
+     */
+    public function getUserEvents(Request $request, $userId): JsonResponse
+    {
+        try {
+            $query = Event::with(['category', 'user'])
+                ->where('user_id', $userId);
+
+            // Filter by status
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // Filter by date range
+            if ($request->has('date_from')) {
+                $query->where('start_datetime', '>=', $request->date_from);
+            }
+            if ($request->has('date_to')) {
+                $query->where('end_datetime', '<=', $request->date_to);
+            }
+
+            // Filter upcoming events only
+            if ($request->has('upcoming') && $request->boolean('upcoming')) {
+                $query->where('start_datetime', '>', now());
+            }
+
+            // Filter by completion percentage
+            if ($request->has('completion_min')) {
+                $query->where('completion_percentage', '>=', $request->completion_min);
+            }
+            if ($request->has('completion_max')) {
+                $query->where('completion_percentage', '<=', $request->completion_max);
+            }
+
+            // Filter by priority
+            if ($request->has('priority')) {
+                $query->where('priority', $request->priority);
+            }
+            if ($request->has('priority_min')) {
+                $query->where('priority', '>=', $request->priority_min);
+            }
+
+            // Search in title and description
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
+            // Filter manually created tasks
+            if ($request->has('manual_only') && $request->boolean('manual_only')) {
+                $query->whereJsonContains('event_metadata->created_manually', true);
+            }
+
+            // Sorting
+            $sortBy = $request->get('sort_by', 'start_datetime');
+            $sortOrder = $request->get('sort_order', 'asc');
+            
+            // Validate sort fields
+            $allowedSortFields = ['start_datetime', 'end_datetime', 'title', 'priority', 'status', 'completion_percentage', 'created_at'];
+            if (!in_array($sortBy, $allowedSortFields)) {
+                $sortBy = 'start_datetime';
+            }
+            
+            $query->orderBy($sortBy, $sortOrder);
+
+            // Pagination or get all
+            if ($request->has('paginate') && $request->boolean('paginate')) {
+                $perPage = $request->get('per_page', 15);
+                $events = $query->paginate($perPage);
+                
+                return response()->json([
+                    'status' => 'success',
+                    'message' => "User's events retrieved successfully",
+                    'data' => $events->items(),
+                    'pagination' => [
+                        'current_page' => $events->currentPage(),
+                        'last_page' => $events->lastPage(),
+                        'per_page' => $events->perPage(),
+                        'total' => $events->total(),
+                        'from' => $events->firstItem(),
+                        'to' => $events->lastItem()
+                    ]
+                ]);
+            } else {
+                $events = $query->get();
+                
+                return response()->json([
+                    'status' => 'success',
+                    'message' => "User's events retrieved successfully",
+                    'total' => $events->count(),
+                    'data' => $events,
+                    'user_id' => $userId,
+                    'filters_applied' => array_keys($request->query()),
+                    'ai_selection_ready' => true
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve user events',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Create a manual task that interacts with the event table.
      */
     public function createManualTask(Request $request): JsonResponse
