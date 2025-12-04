@@ -228,7 +228,7 @@ Route::prefix('v1')->group(function () {
     Route::post('welcome-screens', [WelcomeScreenController::class, 'store']);
 
     // Admin feature highlights routes (authentication required)
-    Route::middleware('auth:api')->prefix('feature-highlights')->group(function () {
+    Route::prefix('feature-highlights')->group(function () {
         Route::post('/', [FeatureHighlightController::class, 'store']);
         Route::put('{featureHighlight}', [FeatureHighlightController::class, 'update']);
         Route::patch('{featureHighlight}', [FeatureHighlightController::class, 'update']);
