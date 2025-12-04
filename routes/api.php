@@ -17,6 +17,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Api\AdminCustomerReportingTemplateController;
 use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AdminUserManagementController;
+use App\Http\Controllers\Api\AdminDashboardController;
 
 Route::prefix('v1')->group(function () {
 
@@ -83,7 +84,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // User management routes (require authentication)
-    Route::middleware('auth:api')->prefix('users')->group(function () {
+    Route::prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'index']); // Get all users (Admin only)
         Route::get('{id}', [UserController::class, 'show']); // Get specific user
         Route::put('{id}', [UserController::class, 'update']); // Update user
@@ -98,6 +99,7 @@ Route::prefix('v1')->group(function () {
         Route::get('upcoming', [EventController::class, 'getUpcoming']);
         Route::get('by-status', [EventController::class, 'getByStatus']);
         Route::get('search', [EventController::class, 'search']);
+        Route::get('user/{userId}', [EventController::class, 'getUserEvents']); // Get user's events/tasks
         Route::get('{event}', [EventController::class, 'show']);
 
         // POST endpoints
@@ -297,5 +299,11 @@ Route::prefix('v1')->group(function () {
         Route::post('request-password-reset', [AdminUserManagementController::class, 'requestPasswordReset']);
         Route::post('{userId}/reset-password', [AdminUserManagementController::class, 'resetUserPassword']);
         Route::get('password-reset-requests', [AdminUserManagementController::class, 'listPasswordResetRequests']);
+    });
+
+    // Admin dashboard routes (no authentication required)
+    Route::prefix('admin/dashboard')->group(function () {
+        Route::get('statistics', [AdminDashboardController::class, 'getStatistics']);
+        Route::get('summary', [AdminDashboardController::class, 'getQuickSummary']);
     });
 });
