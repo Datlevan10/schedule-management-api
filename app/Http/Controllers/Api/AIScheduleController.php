@@ -342,7 +342,7 @@ class AIScheduleController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
-            ])->timeout(60)->post('https://api.openai.com/v1/chat/completions', [
+            ])->timeout(120)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $model,
                 'messages' => [
                     [
@@ -563,7 +563,7 @@ class AIScheduleController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
-            ])->timeout(60)->post('https://api.openai.com/v1/chat/completions', [
+            ])->timeout(120)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $model,
                 'messages' => [
                     [
@@ -626,13 +626,24 @@ class AIScheduleController extends Controller
         } catch (\Exception $e) {
             Log::error('AI selected tasks analysis failed', [
                 'user_id' => $userId,
-                'error' => $e->getMessage()
+                'selected_tasks' => $validated['selected_tasks'] ?? [],
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to analyze selected tasks',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'debug' => [
+                    'user_id' => $userId,
+                    'error_type' => get_class($e),
+                    'error_line' => $e->getLine(),
+                    'openai_configured' => !empty(env('OPENAI_API_KEY')),
+                    'selected_tasks_count' => count($validated['selected_tasks'] ?? [])
+                ]
             ], 500);
         }
     }
