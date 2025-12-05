@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\AdminCustomerReportingTemplateController;
 use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AdminUserManagementController;
 use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\OpenAITestController;
+use App\Http\Controllers\Api\AIScheduleController;
 
 Route::prefix('v1')->group(function () {
 
@@ -305,5 +307,22 @@ Route::prefix('v1')->group(function () {
     Route::prefix('admin/dashboard')->group(function () {
         Route::get('statistics', [AdminDashboardController::class, 'getStatistics']);
         Route::get('summary', [AdminDashboardController::class, 'getQuickSummary']);
+    });
+
+    // OpenAI testing routes (no authentication required)
+    Route::prefix('test')->group(function () {
+        Route::post('openai', [OpenAITestController::class, 'testConnection']);
+        Route::post('openai/schedule', [OpenAITestController::class, 'testScheduleAnalysis']);
+    });
+
+    // Task selection and AI Schedule Analysis routes (no authentication required)
+    Route::prefix('tasks')->group(function () {
+        Route::get('user/{userId}/list', [AIScheduleController::class, 'getUserTasksForSelection']);
+    });
+
+    Route::prefix('ai-schedule')->group(function () {
+        Route::get('user/{userId}/tasks', [AIScheduleController::class, 'getUserTasksForAI']);
+        Route::post('analyze/{userId}', [AIScheduleController::class, 'analyzeUserSchedule']);
+        Route::post('analyze-selected/{userId}', [AIScheduleController::class, 'analyzeSelectedTasks']);
     });
 });
