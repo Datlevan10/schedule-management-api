@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\RawScheduleEntry;
 use App\Models\User;
+use App\Models\AiScheduleAnalysis;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -363,10 +364,7 @@ class AIScheduleController extends Controller
                 $analysis = $aiResponse['choices'][0]['message']['content'];
 
                 // Try to parse as JSON for structured response
-                $structuredAnalysis = null;
-                if ($decodedAnalysis = json_decode($analysis, true)) {
-                    $structuredAnalysis = $decodedAnalysis;
-                }
+                $structuredAnalysis = $this->parseAIResponse($analysis);
 
                 return response()->json([
                     'status' => 'success',
@@ -559,6 +557,9 @@ class AIScheduleController extends Controller
 
             $prompt = $this->buildSelectedTasksPrompt($sortedTasks, $summary, $analysisType, $focusAreas, $additionalContext);
 
+            // Start timing for processing
+            $processingStartTime = microtime(true);
+
             // Call OpenAI API
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
@@ -584,15 +585,65 @@ class AIScheduleController extends Controller
                 $analysis = $aiResponse['choices'][0]['message']['content'];
 
                 // Try to parse as JSON for structured response
-                $structuredAnalysis = null;
-                if ($decodedAnalysis = json_decode($analysis, true)) {
-                    $structuredAnalysis = $decodedAnalysis;
-                }
+                $structuredAnalysis = $this->parseAIResponse($analysis);
+
+                // Calculate processing time and API cost estimates
+                $processingTime = round((microtime(true) - $processingStartTime) * 1000); // milliseconds as integer
+                $tokenUsage = $aiResponse['usage']['total_tokens'] ?? null;
+                $apiCost = $this->estimateApiCost($tokenUsage, $model);
+
+                // Save analysis to database
+                $analysisRecord = AiScheduleAnalysis::create([
+                    'user_id' => $userId,
+                    'input_data' => [
+                        'selected_tasks' => $sortedTasks->toArray(),
+                        'task_summary' => $summary,
+                        'selection_metadata' => [
+                            'total_selected' => count($validated['selected_tasks']),
+                            'manual_selected' => count($manualTaskIds),
+                            'imported_selected' => count($importedTaskIds),
+                        ]
+                    ],
+                    'analysis_type' => $analysisType,
+                    'target_date' => $sortedTasks->first()['start_datetime'] ? 
+                        date('Y-m-d', strtotime($sortedTasks->first()['start_datetime'])) : 
+                        now()->toDateString(),
+                    'end_date' => $sortedTasks->last()['start_datetime'] ? 
+                        date('Y-m-d', strtotime($sortedTasks->last()['start_datetime'])) : null,
+                    'status' => 'completed',
+                    'ai_model' => $model,
+                    'ai_request_payload' => [
+                        'model' => $model,
+                        'prompt' => $prompt,
+                        'max_tokens' => 1500,
+                        'temperature' => 0.7,
+                        'focus_areas' => $focusAreas,
+                        'additional_context' => $additionalContext
+                    ],
+                    'ai_response' => $aiResponse,
+                    'optimized_schedule' => $structuredAnalysis,
+                    'optimization_metrics' => [
+                        'tasks_analyzed' => $sortedTasks->count(),
+                        'total_duration_minutes' => $summary['total_duration_minutes'],
+                        'confidence_level' => 'high'
+                    ],
+                    'ai_reasoning' => $analysis,
+                    'confidence_score' => 0.85, // High confidence for selected tasks
+                    'user_preferences' => [
+                        'analysis_type' => $analysisType,
+                        'focus_areas' => $focusAreas
+                    ],
+                    'processing_time_ms' => $processingTime,
+                    'token_usage' => $tokenUsage,
+                    'api_cost' => $apiCost,
+                    'retry_count' => 0
+                ]);
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Selected tasks analysis completed',
+                    'message' => 'Selected tasks analysis completed and saved',
                     'data' => [
+                        'analysis_id' => $analysisRecord->id,
                         'user_id' => $userId,
                         'analysis_type' => $analysisType,
                         'focus_areas' => $focusAreas,
@@ -603,19 +654,56 @@ class AIScheduleController extends Controller
                             'structured_response' => $structuredAnalysis,
                             'model_used' => $model,
                             'usage' => $aiResponse['usage'] ?? null,
-                            'confidence' => 'high', // Based on selected tasks
+                            'confidence' => 'high',
+                            'processing_time_ms' => $processingTime,
+                            'api_cost' => $apiCost
                         ],
                         'recommendations' => $structuredAnalysis['recommendations'] ?? null,
-                        'analyzed_at' => now()->toISOString(),
+                        'analyzed_at' => $analysisRecord->created_at->toISOString(),
+                        'selection_metadata' => [
+                            'total_selected' => count($validated['selected_tasks']),
+                            'manual_selected' => count($manualTaskIds),
+                            'imported_selected' => count($importedTaskIds),
+                        ],
+                        'saved_to_database' => true
+                    ]
+                ]);
+
+            } else {
+                $processingTime = round((microtime(true) - $processingStartTime) * 1000);
+                
+                // Save failed analysis to database
+                AiScheduleAnalysis::create([
+                    'user_id' => $userId,
+                    'input_data' => [
+                        'selected_tasks' => $sortedTasks->toArray(),
+                        'task_summary' => $summary,
                         'selection_metadata' => [
                             'total_selected' => count($validated['selected_tasks']),
                             'manual_selected' => count($manualTaskIds),
                             'imported_selected' => count($importedTaskIds),
                         ]
-                    ]
+                    ],
+                    'analysis_type' => $analysisType,
+                    'target_date' => $sortedTasks->first()['start_datetime'] ? 
+                        date('Y-m-d', strtotime($sortedTasks->first()['start_datetime'])) : 
+                        now()->toDateString(),
+                    'status' => 'failed',
+                    'ai_model' => $model,
+                    'ai_request_payload' => [
+                        'model' => $model,
+                        'prompt' => $prompt,
+                        'focus_areas' => $focusAreas,
+                    ],
+                    'error_details' => [
+                        'http_status' => $response->status(),
+                        'error_response' => $response->json(),
+                        'error_message' => 'OpenAI API request failed'
+                    ],
+                    'processing_time_ms' => $processingTime,
+                    'retry_count' => 0
                 ]);
 
-            } else {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'AI analysis failed',
@@ -624,6 +712,42 @@ class AIScheduleController extends Controller
             }
 
         } catch (\Exception $e) {
+            // Try to save failed analysis with exception details
+            try {
+                if (isset($sortedTasks) && isset($summary) && isset($analysisType)) {
+                    AiScheduleAnalysis::create([
+                        'user_id' => $userId,
+                        'input_data' => [
+                            'selected_tasks' => $sortedTasks->toArray(),
+                            'task_summary' => $summary ?? [],
+                            'selection_metadata' => [
+                                'total_selected' => count($validated['selected_tasks'] ?? []),
+                                'manual_selected' => count($manualTaskIds ?? []),
+                                'imported_selected' => count($importedTaskIds ?? []),
+                            ]
+                        ],
+                        'analysis_type' => $analysisType ?? 'general',
+                        'target_date' => now()->toDateString(),
+                        'status' => 'failed',
+                        'ai_model' => $model ?? 'unknown',
+                        'error_details' => [
+                            'exception_type' => get_class($e),
+                            'error_message' => $e->getMessage(),
+                            'error_file' => $e->getFile(),
+                            'error_line' => $e->getLine(),
+                        ],
+                        'processing_time_ms' => isset($processingStartTime) ? 
+                            round((microtime(true) - $processingStartTime) * 1000) : null,
+                        'retry_count' => 0
+                    ]);
+                }
+            } catch (\Exception $dbException) {
+                Log::error('Failed to save failed analysis to database', [
+                    'original_error' => $e->getMessage(),
+                    'database_error' => $dbException->getMessage()
+                ]);
+            }
+
             Log::error('AI selected tasks analysis failed', [
                 'user_id' => $userId,
                 'selected_tasks' => $validated['selected_tasks'] ?? [],
@@ -681,5 +805,68 @@ class AIScheduleController extends Controller
         $prompt .= "Provide response in JSON format with structured recommendations.";
 
         return $prompt;
+    }
+
+    /**
+     * Parse JSON from AI response, handling markdown code blocks
+     */
+    private function parseAIResponse($analysis): ?array
+    {
+        // First try direct JSON decode
+        if ($decodedAnalysis = json_decode($analysis, true)) {
+            return $decodedAnalysis;
+        }
+        
+        // Try to extract JSON from markdown code blocks
+        if (preg_match('/```json\s*\n(.*?)\n```/s', $analysis, $matches)) {
+            $jsonString = trim($matches[1]);
+            if ($decodedAnalysis = json_decode($jsonString, true)) {
+                return $decodedAnalysis;
+            }
+        } else if (preg_match('/```\s*\n(.*?)\n```/s', $analysis, $matches)) {
+            // Try without 'json' keyword
+            $jsonString = trim($matches[1]);
+            if ($decodedAnalysis = json_decode($jsonString, true)) {
+                return $decodedAnalysis;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Estimate API cost based on token usage and model
+     */
+    private function estimateApiCost($tokenUsage, $model): ?float
+    {
+        if (!$tokenUsage) {
+            return null;
+        }
+
+        // OpenAI pricing per 1M tokens (as of 2024)
+        $pricingPer1M = [
+            'gpt-4o-mini' => [
+                'input' => 0.15,  // $0.15 per 1M input tokens
+                'output' => 0.60  // $0.60 per 1M output tokens
+            ],
+            'gpt-4' => [
+                'input' => 30.00,
+                'output' => 60.00
+            ],
+            'gpt-4-turbo' => [
+                'input' => 10.00,
+                'output' => 30.00
+            ]
+        ];
+
+        $pricing = $pricingPer1M[$model] ?? $pricingPer1M['gpt-4o-mini'];
+        
+        $inputTokens = $tokenUsage['prompt_tokens'] ?? 0;
+        $outputTokens = $tokenUsage['completion_tokens'] ?? 0;
+        
+        $inputCost = ($inputTokens / 1000000) * $pricing['input'];
+        $outputCost = ($outputTokens / 1000000) * $pricing['output'];
+        
+        return round($inputCost + $outputCost, 4);
     }
 }

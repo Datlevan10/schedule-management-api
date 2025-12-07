@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\AdminUserManagementController;
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\OpenAITestController;
 use App\Http\Controllers\Api\AIScheduleController;
+use App\Http\Controllers\Api\AiAnalysisController;
 
 Route::prefix('v1')->group(function () {
 
@@ -324,5 +325,26 @@ Route::prefix('v1')->group(function () {
         Route::get('user/{userId}/tasks', [AIScheduleController::class, 'getUserTasksForAI']);
         Route::post('analyze/{userId}', [AIScheduleController::class, 'analyzeUserSchedule']);
         Route::post('analyze-selected/{userId}', [AIScheduleController::class, 'analyzeSelectedTasks']);
+    });
+
+    // AI Analysis Results API (no authentication required for now)
+    Route::prefix('ai-analyses')->group(function () {
+        // Get specific analysis by ID
+        Route::get('{analysisId}', [AiAnalysisController::class, 'show']);
+        
+        // Get all analyses for a user with filtering
+        Route::get('user/{userId}', [AiAnalysisController::class, 'getUserAnalyses']);
+        
+        // Get analysis summary/statistics
+        Route::get('user/{userId}/summary', [AiAnalysisController::class, 'getUserAnalysisSummary']);
+        
+        // Get task priority recommendations from specific analysis
+        Route::get('{analysisId}/priority-recommendations', [AiAnalysisController::class, 'getTaskPriorityRecommendations']);
+        
+        // Get latest task priority recommendations for user
+        Route::get('user/{userId}/latest-priorities', [AiAnalysisController::class, 'getLatestUserPriorities']);
+        
+        // Update analysis feedback
+        Route::patch('{analysisId}/feedback', [AiAnalysisController::class, 'updateFeedback']);
     });
 });
