@@ -52,6 +52,9 @@ class OpenAIScheduleService
             $startTime = microtime(true);
             
             $response = Http::withToken($this->apiKey)
+                ->withOptions([
+                    'verify' => false,
+                ])
                 ->timeout(30)
                 ->post($this->apiUrl, $payload);
 
@@ -405,6 +408,9 @@ Always provide reasoning for your scheduling decisions.";
         
         try {
             $response = Http::withToken($this->apiKey)
+                ->withOptions([
+                    'verify' => false,
+                ])
                 ->post($this->apiUrl, [
                     'model' => $this->model,
                     'messages' => [
