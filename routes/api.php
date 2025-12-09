@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\OpenAITestController;
 use App\Http\Controllers\Api\AIScheduleController;
 use App\Http\Controllers\Api\AiAnalysisController;
+use App\Http\Controllers\Api\AIAnalyticsController;
 
 Route::prefix('v1')->group(function () {
 
@@ -121,7 +122,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/', [EventController::class, 'createManualTask']);
     });
 
-    Route::middleware('auth:api')->prefix('schedule-imports')->group(function () {
+    Route::prefix('schedule-imports')->group(function () {
         // Import management
         Route::get('/', [ScheduleImportController::class, 'index']);
         Route::post('/', [ScheduleImportController::class, 'store']);
@@ -344,7 +345,30 @@ Route::prefix('v1')->group(function () {
         // Get latest task priority recommendations for user
         Route::get('user/{userId}/latest-priorities', [AiAnalysisController::class, 'getLatestUserPriorities']);
         
+        // Get deletable task recommendations based on AI analysis
+        Route::get('{analysisId}/deletable-tasks', [AiAnalysisController::class, 'getDeletableTaskRecommendations']);
+        
         // Update analysis feedback
         Route::patch('{analysisId}/feedback', [AiAnalysisController::class, 'updateFeedback']);
+        
+        // Task deletion endpoints based on AI recommendations
+        Route::delete('tasks/bulk-delete', [AiAnalysisController::class, 'bulkDeleteTasks']);
+        Route::delete('tasks/{taskId}/complete-removal', [AiAnalysisController::class, 'completeTaskRemoval']);
+        Route::delete('tasks/{taskId}', [AiAnalysisController::class, 'deleteTask']);
+        
+        // Update analysis data after task operations
+        Route::patch('{analysisId}/remove-task/{taskId}', [AiAnalysisController::class, 'removeTaskFromAnalysis']);
+    });
+
+    // AI Analytics API (no authentication required for now)
+    Route::prefix('ai-analytics')->group(function () {
+        // Dashboard analytics for admin panel
+        Route::get('dashboard', [AIAnalyticsController::class, 'getDashboardAnalytics']);
+        
+        // User-specific analytics
+        Route::get('user/{userId}', [AIAnalyticsController::class, 'getUserAnalytics']);
+        
+        // Chart data for frontend (formatted for chart libraries)
+        Route::get('charts', [AIAnalyticsController::class, 'getChartsData']);
     });
 });

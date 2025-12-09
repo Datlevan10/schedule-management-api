@@ -343,6 +343,8 @@ class AIScheduleController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
+            ])->withOptions([
+                'verify' => false,
             ])->timeout(120)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $model,
                 'messages' => [
@@ -564,6 +566,8 @@ class AIScheduleController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
+            ])->withOptions([
+                'verify' => false,
             ])->timeout(120)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $model,
                 'messages' => [

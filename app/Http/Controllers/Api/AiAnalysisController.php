@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiScheduleAnalysis;
 use App\Models\User;
+use App\Models\Event;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AiAnalysisController extends Controller
 {
@@ -542,5 +544,458 @@ class AiAnalysisController extends Controller
         }
 
         return $notifications;
+    }
+
+    /**
+     * Delete task based on AI recommendation
+     * DELETE /api/v1/ai-analyses/tasks/{taskId}
+     */
+    public function deleteTask(Request $request, $taskId): JsonResponse
+    {
+        try {
+            DB::beginTransaction();
+
+            // Find the task/event
+            // Handle manual task IDs (e.g., "manual_14" -> ID 14)
+            $actualId = $taskId;
+            if (str_starts_with($taskId, 'manual_')) {
+                $actualId = str_replace('manual_', '', $taskId);
+            }
+            
+            $task = Event::find($actualId);
+
+            if (!$task) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Task not found',
+                    'error' => "Task with ID {$taskId} does not exist"
+                ], 404);
+            }
+
+            // Store task info before deletion for response
+            $taskInfo = [
+                'task_id' => $taskId, // Keep original format (manual_14)
+                'actual_id' => $actualId, // Show actual database ID
+                'title' => $task->title,
+                'description' => $task->description,
+                'start_time' => $task->start_datetime,
+                'end_time' => $task->end_datetime,
+                'location' => $task->location,
+                'priority' => $task->priority,
+                'status' => $task->status
+            ];
+
+            // Delete the task
+            $task->delete();
+
+            // Log the deletion
+            Log::info('Task deleted based on AI recommendation', [
+                'task_id' => $taskId,
+                'deleted_by' => $request->input('deleted_by', 'ai_recommendation'),
+                'reason' => $request->input('reason', 'AI analysis suggested deletion'),
+                'analysis_id' => $request->input('analysis_id')
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Task deleted successfully',
+                'data' => [
+                    'deleted_task' => $taskInfo,
+                    'deleted_at' => now()->toISOString(),
+                    'deletion_reason' => $request->input('reason', 'AI analysis suggested deletion')
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Failed to delete task', [
+                'task_id' => $taskId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete task',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk delete tasks based on AI recommendations
+     * DELETE /api/v1/ai-analyses/tasks/bulk-delete
+     */
+    public function bulkDeleteTasks(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'task_ids' => 'required|array|min:1',
+                'task_ids.*' => 'required|string',
+                'analysis_id' => 'nullable|integer|exists:ai_schedule_analyses,id',
+                'reason' => 'nullable|string|max:500',
+                'confirm' => 'required|boolean'
+            ]);
+
+            if (!$validated['confirm']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Deletion not confirmed',
+                    'error' => 'Please confirm the bulk deletion by setting confirm to true'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            $deletedTasks = [];
+            $failedDeletions = [];
+
+            foreach ($validated['task_ids'] as $taskId) {
+                try {
+                    // Find the task
+                    // Handle manual task IDs (e.g., "manual_14" -> ID 14)
+                    $actualId = $taskId;
+                    if (str_starts_with($taskId, 'manual_')) {
+                        $actualId = str_replace('manual_', '', $taskId);
+                    }
+                    
+                    $task = Event::find($actualId);
+
+                    if (!$task) {
+                        $failedDeletions[] = [
+                            'task_id' => $taskId,
+                            'error' => 'Task not found'
+                        ];
+                        continue;
+                    }
+
+                    // Store task info
+                    $taskInfo = [
+                        'task_id' => $taskId, // Keep original format
+                        'actual_id' => $actualId, // Show actual database ID
+                        'title' => $task->title,
+                        'description' => $task->description,
+                        'start_time' => $task->start_datetime,
+                        'location' => $task->location,
+                        'priority' => $task->priority
+                    ];
+
+                    // Delete the task
+                    $task->delete();
+                    $deletedTasks[] = $taskInfo;
+
+                } catch (\Exception $e) {
+                    $failedDeletions[] = [
+                        'task_id' => $taskId,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            // Log the bulk deletion
+            Log::info('Bulk task deletion based on AI recommendation', [
+                'deleted_count' => count($deletedTasks),
+                'failed_count' => count($failedDeletions),
+                'analysis_id' => $validated['analysis_id'] ?? null,
+                'reason' => $validated['reason'] ?? 'AI analysis suggested deletion'
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Bulk deletion completed',
+                'data' => [
+                    'deleted_tasks' => $deletedTasks,
+                    'failed_deletions' => $failedDeletions,
+                    'summary' => [
+                        'total_requested' => count($validated['task_ids']),
+                        'successfully_deleted' => count($deletedTasks),
+                        'failed' => count($failedDeletions)
+                    ],
+                    'deleted_at' => now()->toISOString(),
+                    'deletion_reason' => $validated['reason'] ?? 'AI analysis suggested deletion'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Failed to perform bulk task deletion', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to perform bulk deletion',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get deletable task recommendations based on AI analysis
+     * GET /api/v1/ai-analyses/{analysisId}/deletable-tasks
+     */
+    public function getDeletableTaskRecommendations(Request $request, $analysisId): JsonResponse
+    {
+        try {
+            $analysis = AiScheduleAnalysis::findOrFail($analysisId);
+
+            if (!$analysis->input_data || !isset($analysis->input_data['selected_tasks'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No task data found in analysis'
+                ], 400);
+            }
+
+            $selectedTasks = collect($analysis->input_data['selected_tasks']);
+
+            // Identify deletable tasks based on priority and other criteria
+            $deletableTasks = $selectedTasks->filter(function($task) {
+                // Tasks with priority 1 or 2 and optional status
+                return $task['priority'] <= 2 || 
+                       $task['status'] === 'optional' ||
+                       $task['status'] === 'cancelled';
+            })->map(function($task) {
+                return [
+                    'task_id' => $task['task_id'],
+                    'title' => $task['title'],
+                    'description' => $task['description'],
+                    'priority' => $task['priority'],
+                    'status' => $task['status'],
+                    'start_datetime' => $task['start_datetime'],
+                    'location' => $task['location'],
+                    'deletion_reason' => $this->getDeletionReason($task),
+                    'deletion_confidence' => $this->getDeletionConfidence($task)
+                ];
+            })->values();
+
+            // Sort by deletion confidence (highest first)
+            $deletableTasks = $deletableTasks->sortByDesc('deletion_confidence')->values();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Deletable task recommendations retrieved',
+                'data' => [
+                    'analysis_id' => $analysis->id,
+                    'analysis_date' => $analysis->created_at->toISOString(),
+                    'deletable_tasks' => $deletableTasks,
+                    'summary' => [
+                        'total_tasks_analyzed' => $selectedTasks->count(),
+                        'deletable_count' => $deletableTasks->count(),
+                        'deletion_criteria' => [
+                            'low_priority' => 'Tasks with priority 1 or 2',
+                            'optional_status' => 'Tasks marked as optional',
+                            'cancelled_status' => 'Tasks marked as cancelled'
+                        ]
+                    ],
+                    'recommendations' => [
+                        'immediate_deletion' => $deletableTasks->where('deletion_confidence', '>=', 0.8)->pluck('task_id'),
+                        'review_before_deletion' => $deletableTasks->where('deletion_confidence', '<', 0.8)->where('deletion_confidence', '>=', 0.5)->pluck('task_id'),
+                        'keep_for_now' => $deletableTasks->where('deletion_confidence', '<', 0.5)->pluck('task_id')
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get deletable task recommendations', [
+                'analysis_id' => $analysisId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to get deletable recommendations',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper: Get deletion reason for a task
+     */
+    private function getDeletionReason(array $task): string
+    {
+        if ($task['status'] === 'cancelled') {
+            return 'Task has been cancelled';
+        }
+        if ($task['status'] === 'optional') {
+            return 'Task is marked as optional';
+        }
+        if ($task['priority'] == 1) {
+            return 'Lowest priority - Optional/flexible timing';
+        }
+        if ($task['priority'] == 2) {
+            return 'Low priority - Can be rescheduled or removed';
+        }
+        return 'Task can be removed based on current priorities';
+    }
+
+    /**
+     * Helper: Calculate deletion confidence score
+     */
+    private function getDeletionConfidence(array $task): float
+    {
+        $confidence = 0.0;
+
+        // Status-based confidence
+        if ($task['status'] === 'cancelled') {
+            $confidence = 0.95;
+        } elseif ($task['status'] === 'optional') {
+            $confidence = 0.85;
+        } elseif ($task['status'] === 'completed') {
+            $confidence = 0.9;
+        }
+
+        // Priority-based confidence (if not already set by status)
+        if ($confidence == 0.0) {
+            if ($task['priority'] == 1) {
+                $confidence = 0.75;
+            } elseif ($task['priority'] == 2) {
+                $confidence = 0.6;
+            } else {
+                $confidence = 0.3;
+            }
+        }
+
+        return round($confidence, 2);
+    }
+
+    /**
+     * Update AI analysis data after task deletion
+     * PATCH /api/v1/ai-analyses/{analysisId}/remove-task/{taskId}
+     */
+    public function removeTaskFromAnalysis(Request $request, $analysisId, $taskId): JsonResponse
+    {
+        try {
+            DB::beginTransaction();
+
+            $analysis = AiScheduleAnalysis::findOrFail($analysisId);
+
+            if (!$analysis->input_data || !isset($analysis->input_data['selected_tasks'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No task data found in analysis'
+                ], 400);
+            }
+
+            $selectedTasks = collect($analysis->input_data['selected_tasks']);
+            
+            // Remove the deleted task from selected_tasks
+            $updatedTasks = $selectedTasks->filter(function($task) use ($taskId) {
+                return $task['task_id'] !== $taskId;
+            })->values()->toArray();
+
+            // Update input_data
+            $inputData = $analysis->input_data;
+            $inputData['selected_tasks'] = $updatedTasks;
+
+            // Update optimization_metrics if exists
+            $optimizationMetrics = $analysis->optimization_metrics ?? [];
+            if (isset($optimizationMetrics['tasks_analyzed'])) {
+                $optimizationMetrics['tasks_analyzed'] = max(0, $optimizationMetrics['tasks_analyzed'] - 1);
+            }
+
+            // Update the analysis
+            $analysis->update([
+                'input_data' => $inputData,
+                'optimization_metrics' => $optimizationMetrics
+            ]);
+
+            // Log the update
+            Log::info('Task removed from AI analysis data', [
+                'analysis_id' => $analysisId,
+                'task_id' => $taskId,
+                'remaining_tasks' => count($updatedTasks)
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Task removed from analysis data successfully',
+                'data' => [
+                    'analysis_id' => $analysis->id,
+                    'removed_task_id' => $taskId,
+                    'remaining_tasks_count' => count($updatedTasks),
+                    'updated_at' => $analysis->updated_at->toISOString()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Failed to remove task from analysis', [
+                'analysis_id' => $analysisId,
+                'task_id' => $taskId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to remove task from analysis',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete task and update analysis data in one operation
+     * DELETE /api/v1/ai-analyses/tasks/{taskId}/complete-removal
+     */
+    public function completeTaskRemoval(Request $request, $taskId): JsonResponse
+    {
+        try {
+            DB::beginTransaction();
+
+            $analysisId = $request->input('analysis_id');
+            $reason = $request->input('reason', 'AI recommended deletion');
+
+            // First, delete the task
+            $deleteResponse = $this->deleteTask($request, $taskId);
+            $deleteData = json_decode($deleteResponse->content(), true);
+
+            if ($deleteData['status'] !== 'success') {
+                return $deleteResponse;
+            }
+
+            // If analysis_id provided, update the analysis data
+            if ($analysisId) {
+                $updateRequest = new Request(['analysis_id' => $analysisId]);
+                $updateResponse = $this->removeTaskFromAnalysis($updateRequest, $analysisId, $taskId);
+                $updateData = json_decode($updateResponse->content(), true);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Task completely removed from system and analysis data',
+                'data' => [
+                    'deleted_task' => $deleteData['data']['deleted_task'] ?? null,
+                    'analysis_updated' => isset($updateData) && $updateData['status'] === 'success',
+                    'analysis_id' => $analysisId,
+                    'removed_at' => now()->toISOString(),
+                    'reason' => $reason
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Failed to complete task removal', [
+                'task_id' => $taskId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to complete task removal',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
