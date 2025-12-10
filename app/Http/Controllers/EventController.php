@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Services\TaskTemplateService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -321,6 +322,33 @@ class EventController extends Controller
      */
     public function createManualTask(Request $request): JsonResponse
     {
+        $templateService = new TaskTemplateService();
+        
+        // Check if using template
+        if ($request->has('use_template') && $request->has('template_type')) {
+            $templateType = $request->input('template_type');
+            $templateVariables = $request->input('template_variables', []);
+            $language = $request->input('language', 'vi');
+            
+            $templateData = $templateService->generateTaskFromTemplate($templateType, $templateVariables, $language);
+            
+            if (!$templateData) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Invalid template type',
+                    'available_templates' => array_keys($templateService->getAllTemplates())
+                ], 400);
+            }
+            
+            // Merge template data with request data
+            $mergedData = array_merge($templateData, $request->only([
+                'start_datetime', 'end_datetime', 'location', 'status', 
+                'event_category_id', 'user_id', 'priority'
+            ]));
+            
+            $request->merge($mergedData);
+        }
+        
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -338,6 +366,8 @@ class EventController extends Controller
             'task_type' => 'nullable|string|max:100',
             'task_priority_label' => 'nullable|in:low,medium,high,urgent',
             'assigned_to' => 'nullable|integer',
+            'ai_execution_enabled' => 'nullable|boolean',
+            'ai_execution_instructions' => 'nullable|string',
         ]);
 
         // Add manual task specific metadata
@@ -347,7 +377,10 @@ class EventController extends Controller
             'task_priority_label' => $validated['task_priority_label'] ?? 'medium',
             'assigned_to' => $validated['assigned_to'] ?? null,
             'created_by' => auth()->id() ?? null,
-            'created_at' => now()->toISOString()
+            'created_at' => now()->toISOString(),
+            'ai_execution_enabled' => $validated['ai_execution_enabled'] ?? false,
+            'ai_execution_instructions' => $validated['ai_execution_instructions'] ?? null,
+            'template_used' => $request->input('template_type', null)
         ]);
 
         $validated['event_metadata'] = $taskMetaData;
@@ -378,6 +411,7 @@ class EventController extends Controller
         
         // Remove non-database fields
         unset($validated['task_type'], $validated['task_priority_label'], $validated['assigned_to']);
+        unset($validated['ai_execution_enabled'], $validated['ai_execution_instructions']);
 
         $event = Event::create($validated);
         $event->load('category', 'user');
@@ -390,8 +424,336 @@ class EventController extends Controller
                 'type' => $taskMetaData['task_type'],
                 'priority_label' => $taskMetaData['task_priority_label'],
                 'priority_numeric' => $event->priority,
-                'created_by' => $taskMetaData['created_by']
+                'created_by' => $taskMetaData['created_by'],
+                'ai_enabled' => $taskMetaData['ai_execution_enabled'],
+                'template_used' => $taskMetaData['template_used']
             ]
         ], 201);
+    }
+    
+    /**
+     * Get events imported from CSV or other files
+     * GET /api/v1/events/imported
+     */
+    public function getImportedEvents(Request $request): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id', auth()->id() ?? 1);
+            $query = Event::where('user_id', $userId)
+                ->whereJsonContains('event_metadata->imported', true);
+
+            // Filter by import_id if specified
+            if ($request->has('import_id')) {
+                $query->whereJsonContains('event_metadata->import_id', intval($request->import_id));
+            }
+
+            // Filter by date range
+            if ($request->has('date_from')) {
+                $query->where('start_datetime', '>=', $request->date_from);
+            }
+            if ($request->has('date_to')) {
+                $query->where('end_datetime', '<=', $request->date_to);
+            }
+
+            // Filter by status
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // Filter by priority
+            if ($request->has('priority_min')) {
+                $query->where('priority', '>=', $request->priority_min);
+            }
+
+            // Include import details
+            if ($request->boolean('include_import_details')) {
+                $query->with(['category', 'user']);
+            }
+
+            // Sorting
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            $query->orderBy($sortBy, $sortOrder);
+
+            // Pagination or get all
+            if ($request->boolean('paginate', true)) {
+                $perPage = $request->get('per_page', 15);
+                $events = $query->paginate($perPage);
+                
+                // Add import source information to each event
+                $events->getCollection()->transform(function ($event) {
+                    $importId = $event->event_metadata['import_id'] ?? null;
+                    if ($importId) {
+                        $import = \App\Models\RawScheduleImport::find($importId);
+                        if ($import) {
+                            $event->import_source = [
+                                'id' => $import->id,
+                                'filename' => $import->original_filename,
+                                'type' => $import->source_type,
+                                'imported_at' => $import->created_at,
+                                'total_records' => $import->total_records_found
+                            ];
+                        }
+                    }
+                    return $event;
+                });
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Imported events retrieved successfully',
+                    'data' => $events->items(),
+                    'pagination' => [
+                        'current_page' => $events->currentPage(),
+                        'last_page' => $events->lastPage(),
+                        'per_page' => $events->perPage(),
+                        'total' => $events->total()
+                    ]
+                ]);
+            } else {
+                $events = $query->get();
+                
+                // Add import source information
+                $events->transform(function ($event) {
+                    $importId = $event->event_metadata['import_id'] ?? null;
+                    if ($importId) {
+                        $import = \App\Models\RawScheduleImport::find($importId);
+                        if ($import) {
+                            $event->import_source = [
+                                'id' => $import->id,
+                                'filename' => $import->original_filename,
+                                'type' => $import->source_type,
+                                'imported_at' => $import->created_at,
+                                'total_records' => $import->total_records_found
+                            ];
+                        }
+                    }
+                    return $event;
+                });
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Imported events retrieved successfully',
+                    'total' => $events->count(),
+                    'data' => $events
+                ]);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve imported events',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get events grouped by import source
+     * GET /api/v1/events/imported-grouped
+     */
+    public function getImportedEventsGrouped(Request $request): JsonResponse
+    {
+        try {
+            $userId = $request->get('user_id', auth()->id() ?? 1);
+            
+            // Get all imports for the user
+            $imports = \App\Models\RawScheduleImport::where('user_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $groupedEvents = [];
+
+            foreach ($imports as $import) {
+                // Get events for this import
+                $events = Event::where('user_id', $userId)
+                    ->whereJsonContains('event_metadata->import_id', $import->id)
+                    ->get();
+
+                if ($events->count() > 0) {
+                    $groupedEvents[] = [
+                        'import' => [
+                            'id' => $import->id,
+                            'filename' => $import->original_filename,
+                            'source_type' => $import->source_type,
+                            'import_type' => $import->import_type,
+                            'imported_at' => $import->created_at,
+                            'status' => $import->status,
+                            'total_records' => $import->total_records_found,
+                            'successfully_processed' => $import->successfully_processed,
+                            'ai_confidence' => $import->ai_confidence_score
+                        ],
+                        'events_count' => $events->count(),
+                        'events' => $request->boolean('include_events', false) ? $events : null,
+                        'statistics' => [
+                            'scheduled' => $events->where('status', 'scheduled')->count(),
+                            'completed' => $events->where('status', 'completed')->count(),
+                            'in_progress' => $events->where('status', 'in_progress')->count(),
+                            'cancelled' => $events->where('status', 'cancelled')->count(),
+                            'high_priority' => $events->where('priority', '>=', 4)->count()
+                        ]
+                    ];
+                }
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Imported events grouped by source',
+                'total_imports' => count($groupedEvents),
+                'total_events' => array_sum(array_column($groupedEvents, 'events_count')),
+                'data' => $groupedEvents
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve grouped imported events',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Select imported events for AI processing
+     * POST /api/v1/events/select-for-ai
+     */
+    public function selectEventsForAI(Request $request): JsonResponse
+    {
+        $request->validate([
+            'event_ids' => 'nullable|array',
+            'event_ids.*' => 'integer|exists:events,id',
+            'import_id' => 'nullable|integer|exists:raw_schedule_imports,id',
+            'filters' => 'nullable|array',
+            'ai_task' => 'required|string|in:optimize,analyze,reschedule,prioritize,conflict_resolution'
+        ]);
+
+        try {
+            $userId = $request->get('user_id', auth()->id() ?? 1);
+            $query = Event::where('user_id', $userId);
+
+            // Select by specific event IDs
+            if ($request->has('event_ids') && !empty($request->event_ids)) {
+                $query->whereIn('id', $request->event_ids);
+            }
+            // Or select by import ID
+            elseif ($request->has('import_id')) {
+                $query->whereJsonContains('event_metadata->imported', true)
+                      ->whereJsonContains('event_metadata->import_id', intval($request->import_id));
+            }
+            // Or apply filters
+            elseif ($request->has('filters')) {
+                $filters = $request->filters;
+                
+                if (isset($filters['date_from'])) {
+                    $query->where('start_datetime', '>=', $filters['date_from']);
+                }
+                if (isset($filters['date_to'])) {
+                    $query->where('end_datetime', '<=', $filters['date_to']);
+                }
+                if (isset($filters['priority_min'])) {
+                    $query->where('priority', '>=', $filters['priority_min']);
+                }
+                if (isset($filters['status'])) {
+                    $query->where('status', $filters['status']);
+                }
+                if (isset($filters['imported_only']) && $filters['imported_only']) {
+                    $query->whereJsonContains('event_metadata->imported', true);
+                }
+            }
+
+            $events = $query->get();
+
+            if ($events->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No events found matching the criteria'
+                ], 404);
+            }
+
+            // Prepare data for AI processing
+            $aiData = [
+                'task' => $request->ai_task,
+                'events_count' => $events->count(),
+                'events' => $events->map(function ($event) {
+                    return [
+                        'id' => $event->id,
+                        'title' => $event->title,
+                        'description' => $event->description,
+                        'start_datetime' => $event->start_datetime,
+                        'end_datetime' => $event->end_datetime,
+                        'location' => $event->location,
+                        'priority' => $event->priority,
+                        'status' => $event->status,
+                        'ai_metadata' => [
+                            'imported' => $event->event_metadata['imported'] ?? false,
+                            'import_id' => $event->event_metadata['import_id'] ?? null,
+                            'ai_confidence' => $event->event_metadata['ai_confidence'] ?? null,
+                            'entry_id' => $event->event_metadata['entry_id'] ?? null
+                        ]
+                    ];
+                }),
+                'processing_options' => $request->get('processing_options', []),
+                'prepared_at' => now()
+            ];
+
+            // Save selection for AI processing (optional - could store in cache or session)
+            $selectionId = 'ai_selection_' . uniqid();
+            cache()->put($selectionId, $aiData, now()->addHours(1));
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Events selected for AI processing',
+                'selection_id' => $selectionId,
+                'data' => [
+                    'task' => $request->ai_task,
+                    'events_count' => $events->count(),
+                    'events_preview' => $events->take(5)->map(function ($event) {
+                        return [
+                            'id' => $event->id,
+                            'title' => $event->title,
+                            'start_datetime' => $event->start_datetime,
+                            'priority' => $event->priority
+                        ];
+                    }),
+                    'ready_for_ai' => true
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to select events for AI processing',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available task templates
+     */
+    public function getTaskTemplates(Request $request): JsonResponse
+    {
+        $templateService = new TaskTemplateService();
+        $language = $request->input('language', 'vi');
+        
+        $templates = $templateService->getAllTemplates($language);
+        $requirements = $templateService->getTemplateRequirements();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Task templates retrieved successfully',
+            'data' => [
+                'templates' => $templates,
+                'template_requirements' => $requirements,
+                'available_languages' => ['vi'],
+                'usage_example' => [
+                    'use_template' => true,
+                    'template_type' => 'meeting',
+                    'template_variables' => [
+                        'subject' => 'Q4 Planning',
+                        'participants' => 'Team Leaders',
+                        'objectives' => 'Define Q4 goals and KPIs'
+                    ],
+                    'start_datetime' => '2024-01-15 09:00:00',
+                    'end_datetime' => '2024-01-15 11:00:00'
+                ]
+            ]
+        ]);
     }
 }

@@ -30,16 +30,16 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Name is required',
-            'email.required' => 'Email is required',
-            'email.unique' => 'This email is already registered',
-            'password.required' => 'Password is required',
-            'password.min' => 'Password must be at least 8 characters',
-            'password.confirmed' => 'Password confirmation does not match',
-            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
-            'profession_id.required' => 'Please select your profession',
-            'profession_id.exists' => 'Selected profession is invalid',
-            'profession_level.in' => 'Invalid profession level selected',
+            'name.required' => 'Tên là bắt buộc',
+            'email.required' => 'Email là bắt buộc',
+            'email.unique' => 'Email này đã được đăng ký',
+            'password.required' => 'Mật khẩu là bắt buộc',
+            'password.min' => 'Mật khẩu phải có ít nhất 8 ký tự',
+            'password.confirmed' => 'Mật khẩu không khớp',
+            'password.regex' => 'Mật khẩu phải chứa ít nhất một chữ cái viết hoa, một chữ cái viết thường và một số',
+            'profession_id.required' => 'Vui lòng chọn nghề nghiệp của bạn',
+            'profession_id.exists' => 'Nghề nghiệp đã chọn không hợp lệ',
+            'profession_level.in' => 'Cấp bậc nghề nghiệp đã chọn không hợp lệ',
         ];
     }
 }

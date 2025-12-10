@@ -30,10 +30,10 @@ class LoginRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.required' => 'Email is required',
-            'email.email' => 'Please enter a valid email address',
-            'email.exists' => 'No account found with this email address',
-            'password.required' => 'Password is required',
+            'email.required' => 'Bắt ​​buộc phải có email',
+            'email.email' => 'Vui lòng nhập địa chỉ email hợp lệ',
+            'email.exists' => 'Không tìm thấy tài khoản nào với địa chỉ email này',
+            'password.required' => 'Bắt ​​buộc phải có mật khẩu',
         ];
     }
 }

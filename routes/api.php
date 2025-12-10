@@ -103,11 +103,14 @@ Route::prefix('v1')->group(function () {
         Route::get('upcoming', [EventController::class, 'getUpcoming']);
         Route::get('by-status', [EventController::class, 'getByStatus']);
         Route::get('search', [EventController::class, 'search']);
+        Route::get('imported', [EventController::class, 'getImportedEvents']); // Get imported events
+        Route::get('imported-grouped', [EventController::class, 'getImportedEventsGrouped']); // Get imported events grouped
         Route::get('user/{userId}', [EventController::class, 'getUserEvents']); // Get user's events/tasks
         Route::get('{event}', [EventController::class, 'show']);
 
         // POST endpoints
         Route::post('/', [EventController::class, 'store']);
+        Route::post('select-for-ai', [EventController::class, 'selectEventsForAI']); // Select events for AI processing
 
         // PUT/PATCH endpoints
         Route::put('{event}', [EventController::class, 'update']);
@@ -120,6 +123,7 @@ Route::prefix('v1')->group(function () {
     // Manual task creation endpoint (no authentication required)
     Route::prefix('manual-tasks')->group(function () {
         Route::post('/', [EventController::class, 'createManualTask']);
+        Route::get('/templates', [EventController::class, 'getTaskTemplates']);
     });
 
     Route::prefix('schedule-imports')->group(function () {
@@ -127,12 +131,21 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [ScheduleImportController::class, 'index']);
         Route::post('/', [ScheduleImportController::class, 'store']);
         Route::get('statistics', [ScheduleImportController::class, 'statistics']);
+        
+        // CSV Export endpoints
+        Route::post('export-batch', [ScheduleImportController::class, 'exportBatchCsv']);
+        
         Route::get('{id}', [ScheduleImportController::class, 'show']);
         Route::delete('{id}', [ScheduleImportController::class, 'destroy']);
 
         // Import processing
         Route::post('{id}/process', [ScheduleImportController::class, 'process']);
         Route::post('{id}/convert', [ScheduleImportController::class, 'convert']);
+
+        // CSV Export for specific import
+        Route::get('{id}/export', [ScheduleImportController::class, 'exportCsv']);
+        Route::get('{id}/export-events', [ScheduleImportController::class, 'exportEventsCsv']);
+        Route::get('{id}/preview', [ScheduleImportController::class, 'previewExport']);
 
         // Import entries
         Route::get('{id}/entries', [ScheduleImportController::class, 'entries']);

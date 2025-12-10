@@ -9,6 +9,7 @@ use App\Models\RawScheduleImport;
 use App\Models\RawScheduleEntry;
 use App\Models\UserSchedulePreference;
 use App\Services\ScheduleParsingService;
+use App\Services\CsvExportService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -18,10 +19,12 @@ use Illuminate\Support\Facades\Storage;
 class ScheduleImportController extends Controller
 {
     protected $parsingService;
+    protected $csvExportService;
 
-    public function __construct(ScheduleParsingService $parsingService)
+    public function __construct(ScheduleParsingService $parsingService, CsvExportService $csvExportService)
     {
         $this->parsingService = $parsingService;
+        $this->csvExportService = $csvExportService;
     }
 
     /**
@@ -31,7 +34,8 @@ class ScheduleImportController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = RawScheduleImport::where('user_id', Auth::id())
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $query = RawScheduleImport::where('user_id', $userId)
                 ->with(['entries' => function($q) {
                     $q->select('id', 'import_id', 'processing_status', 'conversion_status');
                 }]);
@@ -94,12 +98,31 @@ class ScheduleImportController extends Controller
             'file' => 'required_if:import_type,file_upload|file|max:10240',
             'raw_content' => 'required_if:import_type,manual_input,text_parsing|string',
             'template_id' => 'nullable|exists:schedule_templates,id',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         DB::beginTransaction();
         try {
             /** @var \App\Models\User $user */
             $user = Auth::user();
+            
+            // If no authenticated user, use provided user_id or default user
+            if (!$user) {
+                if ($request->has('user_id')) {
+                    $user = \App\Models\User::find($request->user_id);
+                } else {
+                    // Get or create default user
+                    $user = \App\Models\User::firstOrCreate(
+                        ['email' => 'default@example.com'],
+                        [
+                            'name' => 'Default User',
+                            'password' => bcrypt(uniqid()),
+                            'is_active' => true
+                        ]
+                    );
+                }
+            }
+            
             $preferences = UserSchedulePreference::getOrCreateForUser($user);
 
             // Create import record
@@ -155,10 +178,11 @@ class ScheduleImportController extends Controller
      * Display the specified import
      * GET /api/v1/schedule-imports/{id}
      */
-    public function show($id): JsonResponse
+    public function show($id, Request $request): JsonResponse
     {
         try {
-            $import = RawScheduleImport::where('user_id', Auth::id())
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)
                 ->with(['entries', 'user'])
                 ->findOrFail($id);
 
@@ -182,7 +206,8 @@ class ScheduleImportController extends Controller
     public function entries($id, Request $request): JsonResponse
     {
         try {
-            $import = RawScheduleImport::where('user_id', Auth::id())->findOrFail($id);
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
             
             $query = RawScheduleEntry::where('import_id', $import->id);
 
@@ -241,7 +266,8 @@ class ScheduleImportController extends Controller
     public function process($id, Request $request): JsonResponse
     {
         try {
-            $import = RawScheduleImport::where('user_id', Auth::id())->findOrFail($id);
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
 
             // Check if already processing
             if ($import->status === 'processing') {
@@ -284,12 +310,15 @@ class ScheduleImportController extends Controller
         ]);
 
         try {
-            $import = RawScheduleImport::where('user_id', Auth::id())->findOrFail($id);
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
             
             // Get entries to convert
             $query = RawScheduleEntry::where('import_id', $import->id)
-                ->where('processing_status', 'parsed')
-                ->whereIn('conversion_status', ['pending', 'failed']);
+                ->whereIn('processing_status', ['pending', 'parsed'])
+                ->whereIn('conversion_status', ['pending', 'failed'])
+                ->whereNotNull('parsed_title')
+                ->whereNotNull('parsed_start_datetime');
 
             // Filter by specific entries
             if ($request->has('entry_ids')) {
@@ -349,7 +378,8 @@ class ScheduleImportController extends Controller
         ]);
 
         try {
-            $entry = RawScheduleEntry::where('user_id', Auth::id())->findOrFail($id);
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $entry = RawScheduleEntry::where('user_id', $userId)->findOrFail($id);
 
             // Update parsed data
             $entry->fill($request->only([
@@ -388,10 +418,11 @@ class ScheduleImportController extends Controller
      * Delete an import and its entries
      * DELETE /api/v1/schedule-imports/{id}
      */
-    public function destroy($id): JsonResponse
+    public function destroy($id, Request $request): JsonResponse
     {
         try {
-            $import = RawScheduleImport::where('user_id', Auth::id())->findOrFail($id);
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
 
             // Delete file if exists
             if ($import->file_path && Storage::disk('private')->exists($import->file_path)) {
@@ -418,10 +449,10 @@ class ScheduleImportController extends Controller
      * Get import statistics
      * GET /api/v1/schedule-imports/statistics
      */
-    public function statistics(): JsonResponse
+    public function statistics(Request $request): JsonResponse
     {
         try {
-            $userId = Auth::id();
+            $userId = Auth::id() ?? $request->get('user_id', 1);
 
             $stats = [
                 'total_imports' => RawScheduleImport::where('user_id', $userId)->count(),
@@ -444,6 +475,177 @@ class ScheduleImportController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Export import data as CSV
+     * GET /api/v1/schedule-imports/{id}/export
+     */
+    public function exportCsv($id, Request $request)
+    {
+        try {
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
+            
+            $format = $request->get('format', 'original');
+            $filename = $request->get('filename', 'schedule_export_' . date('Y-m-d_His') . '.csv');
+            
+            $csv = $this->csvExportService->exportImportData($import, $format);
+            
+            return $this->csvExportService->createCsvResponse($csv, $filename);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to export CSV',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Export multiple imports as CSV
+     * POST /api/v1/schedule-imports/export-batch
+     */
+    public function exportBatchCsv(Request $request)
+    {
+        $request->validate([
+            'import_ids' => 'required|array',
+            'import_ids.*' => 'integer|exists:raw_schedule_imports,id',
+            'format' => 'nullable|in:original,parsed,standard,ai_enhanced,vietnamese_school'
+        ]);
+
+        try {
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $imports = RawScheduleImport::where('user_id', $userId)
+                ->whereIn('id', $request->import_ids)
+                ->get();
+
+            if ($imports->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No imports found'
+                ], 404);
+            }
+
+            $format = $request->get('format', 'standard');
+            $allEntries = collect();
+
+            foreach ($imports as $import) {
+                $allEntries = $allEntries->concat($import->entries);
+            }
+
+            $csv = $this->csvExportService->exportImportData($imports->first(), $format);
+            $filename = 'batch_export_' . date('Y-m-d_His') . '.csv';
+
+            return $this->csvExportService->createCsvResponse($csv, $filename);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to export batch CSV',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Export converted events as CSV
+     * GET /api/v1/schedule-imports/{id}/export-events
+     */
+    public function exportEventsCsv($id, Request $request)
+    {
+        try {
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
+            
+            // Get all converted events from this import
+            $eventIds = RawScheduleEntry::where('import_id', $import->id)
+                ->whereNotNull('converted_event_id')
+                ->pluck('converted_event_id');
+            
+            if ($eventIds->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No converted events found for this import'
+                ], 404);
+            }
+            
+            $events = \App\Models\Event::whereIn('id', $eventIds)->get();
+            
+            $format = $request->get('format', 'standard');
+            $filename = 'events_export_' . date('Y-m-d_His') . '.csv';
+            
+            $csv = $this->csvExportService->exportEvents($events, $format);
+            
+            return $this->csvExportService->createCsvResponse($csv, $filename);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to export events CSV',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get CSV export preview (JSON format)
+     * GET /api/v1/schedule-imports/{id}/preview
+     */
+    public function previewExport($id, Request $request): JsonResponse
+    {
+        try {
+            $userId = Auth::id() ?? $request->get('user_id', 1);
+            $import = RawScheduleImport::where('user_id', $userId)->findOrFail($id);
+            
+            $format = $request->get('format', 'original');
+            $limit = $request->get('limit', 5);
+            
+            $entries = $import->entries()->limit($limit)->get();
+            
+            $preview = [];
+            foreach ($entries as $entry) {
+                $preview[] = [
+                    'row_number' => $entry->row_number,
+                    'original_data' => $entry->original_data,
+                    'parsed_data' => [
+                        'title' => $entry->parsed_title,
+                        'description' => $entry->parsed_description,
+                        'start_datetime' => $entry->parsed_start_datetime,
+                        'end_datetime' => $entry->parsed_end_datetime,
+                        'location' => $entry->parsed_location,
+                        'priority' => $entry->parsed_priority
+                    ],
+                    'ai_confidence' => $entry->ai_confidence
+                ];
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Export preview retrieved',
+                'data' => [
+                    'format' => $format,
+                    'total_entries' => $import->entries()->count(),
+                    'preview_count' => count($preview),
+                    'available_formats' => [
+                        'original' => 'Original format as imported',
+                        'parsed' => 'Parsed and processed data',
+                        'standard' => 'Standard calendar format',
+                        'ai_enhanced' => 'With AI suggestions and analysis',
+                        'vietnamese_school' => 'Vietnamese school schedule format'
+                    ],
+                    'entries' => $preview
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate preview',
                 'error' => $e->getMessage()
             ], 500);
         }

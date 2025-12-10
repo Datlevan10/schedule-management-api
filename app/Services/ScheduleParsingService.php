@@ -286,36 +286,69 @@ class ScheduleParsingService
     protected function applyInitialParsing(RawScheduleEntry $entry, UserSchedulePreference $preferences): void
     {
         $data = $entry->original_data;
-
-        // Try to extract common fields
-        $entry->parsed_title = $data['title'] ?? $data['event'] ?? $data['subject'] ?? null;
-        $entry->parsed_description = $data['description'] ?? $data['notes'] ?? $data['details'] ?? null;
-        $entry->parsed_location = $data['location'] ?? $data['venue'] ?? $data['place'] ?? null;
         
-        // Parse dates
-        if (isset($data['date']) || isset($data['start_date']) || isset($data['datetime'])) {
-            $dateStr = $data['date'] ?? $data['start_date'] ?? $data['datetime'];
+        // Convert keys to lowercase for case-insensitive matching
+        $lowerData = array_change_key_case($data, CASE_LOWER);
+
+        // Try to extract common fields (check both original case and lowercase)
+        $entry->parsed_title = $data['Title'] ?? $data['title'] ?? $lowerData['title'] ?? 
+                               $data['event'] ?? $lowerData['event'] ?? 
+                               $data['subject'] ?? $lowerData['subject'] ?? null;
+        
+        $entry->parsed_description = $data['Description'] ?? $data['description'] ?? $lowerData['description'] ?? 
+                                     $data['notes'] ?? $lowerData['notes'] ?? 
+                                     $data['details'] ?? $lowerData['details'] ?? null;
+        
+        $entry->parsed_location = $data['Location'] ?? $data['location'] ?? $lowerData['location'] ?? 
+                                  $data['venue'] ?? $lowerData['venue'] ?? 
+                                  $data['place'] ?? $lowerData['place'] ?? null;
+        
+        // Parse dates - check various field name combinations
+        $startDateField = $data['Start Date'] ?? $data['start_date'] ?? $lowerData['start date'] ?? 
+                         $data['StartDate'] ?? $lowerData['startdate'] ?? 
+                         $data['date'] ?? $lowerData['date'] ?? 
+                         $data['datetime'] ?? $lowerData['datetime'] ?? null;
+        
+        if ($startDateField) {
             try {
-                $entry->parsed_start_datetime = Carbon::parse($dateStr);
+                $entry->parsed_start_datetime = Carbon::parse($startDateField);
             } catch (\Exception $e) {
                 // Date parsing failed
+                Log::warning('Failed to parse start date', [
+                    'value' => $startDateField,
+                    'error' => $e->getMessage()
+                ]);
             }
         }
 
-        if (isset($data['end_date']) || isset($data['end_time'])) {
-            $dateStr = $data['end_date'] ?? $data['end_time'];
+        $endDateField = $data['End Date'] ?? $data['end_date'] ?? $lowerData['end date'] ?? 
+                       $data['EndDate'] ?? $lowerData['enddate'] ?? 
+                       $data['end_time'] ?? $lowerData['end_time'] ?? null;
+        
+        if ($endDateField) {
             try {
-                $entry->parsed_end_datetime = Carbon::parse($dateStr);
+                $entry->parsed_end_datetime = Carbon::parse($endDateField);
             } catch (\Exception $e) {
                 // Date parsing failed
+                Log::warning('Failed to parse end date', [
+                    'value' => $endDateField,
+                    'error' => $e->getMessage()
+                ]);
             }
         }
 
-        // Set default priority
-        $entry->parsed_priority = $data['priority'] ?? $preferences->default_priority;
+        // Set priority - check various field names
+        $priorityField = $data['Priority'] ?? $data['priority'] ?? $lowerData['priority'] ?? 
+                        $data['importance'] ?? $lowerData['importance'] ?? null;
+        
+        if ($priorityField !== null) {
+            $entry->parsed_priority = intval($priorityField);
+        } else {
+            $entry->parsed_priority = $preferences->default_priority ?? 3;
+        }
 
         // Set AI confidence (would be calculated by AI)
-        $entry->ai_confidence = 0.5; // Default confidence
+        $entry->ai_confidence = 0.75; // Higher confidence for structured data
     }
 
     /**
@@ -496,8 +529,8 @@ class ScheduleParsingService
             'end_datetime' => $entry->parsed_end_datetime ?? $entry->parsed_start_datetime->addHour(),
             'location' => $entry->parsed_location,
             'priority' => $entry->parsed_priority ?? 3,
-            'status' => 'upcoming',
-            'metadata' => [
+            'status' => 'scheduled',
+            'event_metadata' => [
                 'imported' => true,
                 'import_id' => $entry->import_id,
                 'entry_id' => $entry->id,
