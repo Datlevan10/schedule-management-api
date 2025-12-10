@@ -56,7 +56,7 @@ class AdminAuthController extends Controller
             if (!Hash::check($request->password, $admin->password)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials'
+                    'message' => 'Thông tin đăng nhập không hợp lệ'
                 ], 401);
             }
 

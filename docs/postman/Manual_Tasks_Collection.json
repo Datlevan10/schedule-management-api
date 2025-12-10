@@ -1,0 +1,335 @@
+{
+  "info": {
+    "name": "Manual Tasks with AI Templates",
+    "description": "Collection for testing manual task creation with Vietnamese templates optimized for AI execution",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Task Templates",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks/templates?language=vi",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks", "templates"],
+          "query": [
+            {
+              "key": "language",
+              "value": "vi"
+            }
+          ]
+        },
+        "description": "Get all available task templates in Vietnamese"
+      }
+    },
+    {
+      "name": "Create Meeting Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"meeting\",\n    \"template_variables\": {\n        \"subject\": \"Sprint Planning Q1 2024\",\n        \"participants\": \"Development Team, Product Owner, Scrum Master\",\n        \"objectives\": \"Lập kế hoạch sprint, ước tính story points, cam kết sprint goal\"\n    },\n    \"start_datetime\": \"2024-01-15 09:00:00\",\n    \"end_datetime\": \"2024-01-15 11:00:00\",\n    \"location\": \"Phòng họp tầng 3\",\n    \"priority\": 5,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"1. Gửi calendar invite cho tất cả participants\\n2. Chuẩn bị Jira board với backlog items\\n3. Tạo meeting notes template\\n4. Send reminder 1 ngày trước\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Report Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"report\",\n    \"template_variables\": {\n        \"report_type\": \"Báo cáo doanh thu tháng\",\n        \"period\": \"Tháng 12/2023\",\n        \"main_content\": \"Doanh thu theo kênh, chi phí, lợi nhuận, so sánh với cùng kỳ\"\n    },\n    \"start_datetime\": \"2024-01-02 09:00:00\",\n    \"end_datetime\": \"2024-01-02 17:00:00\",\n    \"priority\": 4,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Pull data từ database, tạo charts với Tableau, export PDF và gửi cho BOD\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Email Campaign Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"email_campaign\",\n    \"template_variables\": {\n        \"campaign_name\": \"Khuyến mãi Tết Nguyên Đán 2024\",\n        \"target_audience\": \"VIP customers và loyal members\"\n    },\n    \"start_datetime\": \"2024-01-10 08:00:00\",\n    \"end_datetime\": \"2024-01-10 12:00:00\",\n    \"priority\": 4,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Segment list từ CRM, personalize với first name và purchase history, A/B test subject lines\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Content Creation Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"content_creation\",\n    \"template_variables\": {\n        \"content_type\": \"Blog post\",\n        \"topic\": \"10 Xu hướng Digital Marketing 2024\",\n        \"platform\": \"Company Blog và LinkedIn\"\n    },\n    \"start_datetime\": \"2024-01-08 09:00:00\",\n    \"end_datetime\": \"2024-01-08 16:00:00\",\n    \"priority\": 3,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Research trends, write 1500 words, optimize for SEO keywords, create featured image\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Customer Followup Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"customer_followup\",\n    \"template_variables\": {\n        \"customer_name\": \"Công ty ABC\",\n        \"purpose\": \"Gia hạn hợp đồng dịch vụ năm 2024\"\n    },\n    \"start_datetime\": \"2024-01-05 14:00:00\",\n    \"end_datetime\": \"2024-01-05 15:00:00\",\n    \"priority\": 5,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Review contract history, prepare renewal proposal, schedule call với decision maker\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Project Planning Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"project_planning\",\n    \"template_variables\": {\n        \"project_name\": \"Mobile App v2.0 Launch\"\n    },\n    \"start_datetime\": \"2024-01-03 09:00:00\",\n    \"end_datetime\": \"2024-01-03 17:00:00\",\n    \"priority\": 5,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Create WBS in Jira, estimate resources, setup Slack channel, schedule kickoff meeting\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Data Analysis Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"data_analysis\",\n    \"template_variables\": {\n        \"dataset_name\": \"Customer Behavior Q4 2023\",\n        \"objective\": \"Identify churn patterns và recommend retention strategies\"\n    },\n    \"start_datetime\": \"2024-01-04 09:00:00\",\n    \"end_datetime\": \"2024-01-04 17:00:00\",\n    \"priority\": 4,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Extract data từ BigQuery, run clustering analysis, create dashboard in Tableau\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Training Session Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"training_session\",\n    \"template_variables\": {\n        \"training_topic\": \"Agile Scrum Fundamentals\",\n        \"audience\": \"New team members và junior developers\"\n    },\n    \"start_datetime\": \"2024-01-12 14:00:00\",\n    \"end_datetime\": \"2024-01-12 17:00:00\",\n    \"location\": \"Training Room + Zoom\",\n    \"priority\": 3,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Prepare slides, setup Miro board cho exercises, create quiz trong Kahoot\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Social Media Post Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"social_media_post\",\n    \"template_variables\": {\n        \"platform\": \"LinkedIn và Facebook\",\n        \"topic\": \"Company Year-End Achievement 2023\"\n    },\n    \"start_datetime\": \"2024-01-02 10:00:00\",\n    \"end_datetime\": \"2024-01-02 11:00:00\",\n    \"priority\": 2,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Create infographic với Canva, write engaging caption, schedule cho 7PM peak time\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Quality Check Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"use_template\": true,\n    \"template_type\": \"quality_check\",\n    \"template_variables\": {\n        \"item_name\": \"API v2.0 Release Candidate\"\n    },\n    \"start_datetime\": \"2024-01-11 09:00:00\",\n    \"end_datetime\": \"2024-01-11 17:00:00\",\n    \"priority\": 5,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Run automated tests, check security vulnerabilities, validate documentation completeness\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Custom Manual Task (No Template)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"title\": \"Inventory Check - Warehouse A\",\n    \"description\": \"Monthly physical inventory count and reconciliation\",\n    \"requirements\": [\n        \"Print inventory sheets\",\n        \"Assign counting teams\",\n        \"Count physical items\",\n        \"Update system records\"\n    ],\n    \"preparation_items\": [\n        \"Counting sheets\",\n        \"Barcode scanners\",\n        \"Team assignments\",\n        \"Previous count reports\"\n    ],\n    \"start_datetime\": \"2024-01-20 08:00:00\",\n    \"end_datetime\": \"2024-01-20 18:00:00\",\n    \"location\": \"Warehouse A - District 7\",\n    \"priority\": 4,\n    \"ai_execution_enabled\": true,\n    \"ai_execution_instructions\": \"Generate counting sheets từ ERP, assign teams based on availability, prepare variance report template\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/manual-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "manual-tasks"]
+        }
+      }
+    },
+    {
+      "name": "Get User Tasks (AI Enabled)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/events/user/1?manual_only=true&status=scheduled&priority_min=3",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "events", "user", "1"],
+          "query": [
+            {
+              "key": "manual_only",
+              "value": "true"
+            },
+            {
+              "key": "status",
+              "value": "scheduled"
+            },
+            {
+              "key": "priority_min",
+              "value": "3"
+            }
+          ]
+        },
+        "description": "Get all manual tasks for a user that are ready for AI execution"
+      }
+    },
+    {
+      "name": "Update Task Progress",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"completion_percentage\": 50,\n    \"event_metadata\": {\n        \"ai_execution_log\": [\n            {\n                \"timestamp\": \"2024-01-15T10:00:00Z\",\n                \"action\": \"email_sent\",\n                \"details\": \"Sent meeting invite to 5 participants\",\n                \"status\": \"success\"\n            },\n            {\n                \"timestamp\": \"2024-01-15T10:05:00Z\",\n                \"action\": \"agenda_created\",\n                \"details\": \"Created detailed agenda in Confluence\",\n                \"status\": \"success\"\n            }\n        ],\n        \"last_ai_update\": \"2024-01-15T10:05:00Z\"\n    }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/events/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "events", "1"]
+        }
+      }
+    },
+    {
+      "name": "Complete Task",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"status\": \"completed\",\n    \"completion_percentage\": 100,\n    \"event_metadata\": {\n        \"ai_completion_timestamp\": \"2024-01-15T11:00:00Z\",\n        \"ai_execution_summary\": \"Task completed successfully. Meeting conducted with 5 participants. Action items documented.\",\n        \"ai_results\": {\n            \"meeting_duration\": \"2 hours\",\n            \"participants_attended\": 5,\n            \"action_items_created\": 8,\n            \"follow_up_scheduled\": true\n        }\n    }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/events/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "events", "1"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ]
+}

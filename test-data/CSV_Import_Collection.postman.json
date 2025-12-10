@@ -1,0 +1,622 @@
+{
+  "info": {
+    "name": "Schedule CSV Import API",
+    "description": "Complete collection for testing CSV import functionality in Schedule Management API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "import_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "entry_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. CSV Import Operations",
+      "item": [
+        {
+          "name": "Import CSV File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Import successful\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    ",
+                  "    // Save import ID for later use",
+                  "    if(jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set(\"import_id\", jsonData.data.id);",
+                  "        console.log(\"Import ID saved: \" + jsonData.data.id);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test(\"Response has required fields\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('data');",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    pm.expect(jsonData.data).to.have.property('status');",
+                  "    pm.expect(jsonData.data).to.have.property('total_records_found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// You can set dynamic values here",
+                  "pm.variables.set(\"timestamp\", new Date().toISOString());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "import_type",
+                  "value": "file_upload",
+                  "type": "text"
+                },
+                {
+                  "key": "source_type",
+                  "value": "csv",
+                  "type": "text"
+                },
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select your CSV file here"
+                },
+                {
+                  "key": "template_id",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Optional: Specify template ID"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports"]
+            },
+            "description": "Upload a CSV file for schedule import. The CSV should contain columns like Title, Description, Start Date, End Date, Location, and Priority."
+          }
+        },
+        {
+          "name": "Import Manual Text",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Import successful\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    ",
+                  "    if(jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set(\"import_id\", jsonData.data.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"import_type\": \"manual_input\",\n    \"source_type\": \"manual\",\n    \"raw_content\": \"Team Meeting on Monday at 9am in Conference Room A\\nProject Review with stakeholders on Tuesday from 2-4pm\\nCode deployment on Friday evening at 8pm\",\n    \"user_id\": {{user_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports"]
+            },
+            "description": "Import schedule data from manual text input"
+          }
+        },
+        {
+          "name": "Import JSON Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"import_type\": \"manual_input\",\n    \"source_type\": \"json\",\n    \"raw_content\": \"[{\\\"title\\\":\\\"Planning Meeting\\\",\\\"description\\\":\\\"Q1 Planning\\\",\\\"start_date\\\":\\\"2024-01-25 09:00:00\\\",\\\"end_date\\\":\\\"2024-01-25 11:00:00\\\",\\\"location\\\":\\\"Room 301\\\",\\\"priority\\\":5}]\",\n    \"user_id\": {{user_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports"]
+            },
+            "description": "Import schedule data from JSON format"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Import Management",
+      "item": [
+        {
+          "name": "List All Imports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports?user_id={{user_id}}&per_page=10&sort_by=created_at&sort_order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "created_at"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc"
+                },
+                {
+                  "key": "status",
+                  "value": "completed",
+                  "disabled": true
+                },
+                {
+                  "key": "import_type",
+                  "value": "file_upload",
+                  "disabled": true
+                },
+                {
+                  "key": "from_date",
+                  "value": "2024-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to_date",
+                  "value": "2024-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get all imports for the specified user with optional filtering"
+          }
+        },
+        {
+          "name": "Get Import Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/{{import_id}}?user_id={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "{{import_id}}"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Get detailed information about a specific import"
+          }
+        },
+        {
+          "name": "Get Import Entries",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Entries retrieved\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    ",
+                  "    // Save first entry ID if available",
+                  "    if(jsonData.data && jsonData.data.length > 0) {",
+                  "        pm.collectionVariables.set(\"entry_id\", jsonData.data[0].id);",
+                  "        console.log(\"Entry ID saved: \" + jsonData.data[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/{{import_id}}/entries?user_id={{user_id}}&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "{{import_id}}", "entries"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                },
+                {
+                  "key": "processing_status",
+                  "value": "pending",
+                  "disabled": true
+                },
+                {
+                  "key": "conversion_status",
+                  "value": "pending",
+                  "disabled": true
+                },
+                {
+                  "key": "manual_review_required",
+                  "value": "false",
+                  "disabled": true
+                },
+                {
+                  "key": "min_confidence",
+                  "value": "0.7",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get all entries from a specific import with filtering options"
+          }
+        },
+        {
+          "name": "Get Import Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/statistics?user_id={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "statistics"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Get overall statistics for all imports"
+          }
+        },
+        {
+          "name": "Delete Import",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/{{import_id}}?user_id={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "{{import_id}}"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Delete an import and all its associated entries"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Processing & Conversion",
+      "item": [
+        {
+          "name": "Process Import",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"template_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/{{import_id}}/process?user_id={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "{{import_id}}", "process"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Process or reprocess an import with AI analysis"
+          }
+        },
+        {
+          "name": "Convert to Events",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"min_confidence\": 0.5,\n    \"entry_ids\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/{{import_id}}/convert?user_id={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "{{import_id}}", "convert"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Convert parsed entries to events. Optionally specify entry_ids array to convert specific entries only."
+          }
+        },
+        {
+          "name": "Update Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"parsed_title\": \"Updated Meeting Title\",\n    \"parsed_description\": \"This is the updated description\",\n    \"parsed_start_datetime\": \"2024-01-25 10:00:00\",\n    \"parsed_end_datetime\": \"2024-01-25 11:30:00\",\n    \"parsed_location\": \"Conference Room B\",\n    \"parsed_priority\": 4,\n    \"manual_review_notes\": \"Manually reviewed and corrected\",\n    \"manual_review_required\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports/entries/{{entry_id}}?user_id={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports", "entries", "{{entry_id}}"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Manually update an entry's parsed data before conversion"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Sample CSV Data",
+      "item": [
+        {
+          "name": "Sample: Basic Schedule",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Title,Description,Start Date,End Date,Location,Priority\nDaily Standup,Team sync meeting,2024-01-22 09:00:00,2024-01-22 09:15:00,Zoom,2\nSprint Planning,Plan next sprint,2024-01-22 10:00:00,2024-01-22 12:00:00,Conference Room,5\nCode Review,Review PR #123,2024-01-22 14:00:00,2024-01-22 15:00:00,Dev Room,3",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports"]
+            },
+            "description": "Sample CSV data for testing. Copy this format for your CSV files."
+          }
+        },
+        {
+          "name": "Sample: Vietnamese Schedule",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Title,Description,Start Date,End Date,Location,Priority\nHọp dự án,Thảo luận tiến độ Q1,2024-01-22 09:00:00,2024-01-22 11:00:00,Phòng họp 301,5\nBáo cáo tuần,Tổng hợp báo cáo,2024-01-22 14:00:00,2024-01-22 16:00:00,Văn phòng,4\nĐào tạo,Hướng dẫn nhân viên mới,2024-01-23 08:30:00,2024-01-23 12:00:00,Phòng đào tạo,3",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/schedule-imports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "schedule-imports"]
+            },
+            "description": "Sample Vietnamese CSV data"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Verification",
+      "item": [
+        {
+          "name": "Check Created Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/events?user_id={{user_id}}&sort_by=created_at&sort_order=desc&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "events"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "created_at"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Verify that imported entries were successfully converted to events"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Request URL:', pm.request.url.toString());",
+          "console.log('Request Method:', pm.request.method);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test(\"Response time is less than 2000ms\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+          "});",
+          "",
+          "if (pm.response.code !== 204) {",
+          "    pm.test(\"Response is JSON\", function () {",
+          "        pm.response.to.be.json;",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

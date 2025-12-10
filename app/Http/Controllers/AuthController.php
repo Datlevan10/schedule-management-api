@@ -102,7 +102,7 @@ class AuthController extends Controller
             if (!$token = JWTAuth::attempt($credentials)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials'
+                    'message' => 'Thông tin đăng nhập không hợp lệ'
                 ], 401);
             }
 
@@ -409,7 +409,7 @@ class AuthController extends Controller
             if (!Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials'
+                    'message' => 'Thông tin đăng nhập không hợp lệ'
                 ], 401);
             }
 

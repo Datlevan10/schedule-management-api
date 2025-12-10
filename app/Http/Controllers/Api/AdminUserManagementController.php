@@ -252,7 +252,7 @@ class AdminUserManagementController extends Controller
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User not found with this email address'
+                    'message' => 'Không tìm thấy người dùng với địa chỉ email này.'
                 ], 404);
             }
 
