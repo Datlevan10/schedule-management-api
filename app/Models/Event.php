@@ -27,7 +27,12 @@ class Event extends Model
         'preparation_items',
         'completion_percentage',
         'recurring_pattern',
-        'parent_event_id'
+        'parent_event_id',
+        'ai_analysis_status',
+        'ai_analyzed_at',
+        'ai_analysis_id',
+        'ai_analysis_result',
+        'ai_analysis_locked'
     ];
 
     protected $casts = [
@@ -37,7 +42,10 @@ class Event extends Model
         'participants' => 'array',
         'requirements' => 'array',
         'preparation_items' => 'array',
-        'recurring_pattern' => 'array'
+        'recurring_pattern' => 'array',
+        'ai_analysis_result' => 'array',
+        'ai_analyzed_at' => 'datetime',
+        'ai_analysis_locked' => 'boolean'
     ];
 
     public function category()
@@ -58,5 +66,106 @@ class Event extends Model
     public function childEvents()
     {
         return $this->hasMany(Event::class, 'parent_event_id');
+    }
+
+    /**
+     * Check if event is available for AI analysis
+     */
+    public function isAvailableForAiAnalysis(): bool
+    {
+        return !$this->ai_analysis_locked && 
+               in_array($this->ai_analysis_status, ['pending', 'failed']);
+    }
+
+    /**
+     * Check if event has been analyzed by AI
+     */
+    public function isAiAnalyzed(): bool
+    {
+        return $this->ai_analysis_status === 'completed';
+    }
+
+    /**
+     * Check if AI analysis is in progress
+     */
+    public function isAiAnalysisInProgress(): bool
+    {
+        return $this->ai_analysis_status === 'in_progress';
+    }
+
+    /**
+     * Mark event as being analyzed by AI
+     */
+    public function markAsAiAnalysisInProgress(string $analysisId = null): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'in_progress',
+            'ai_analysis_id' => $analysisId,
+            'ai_analysis_locked' => true,
+        ]);
+    }
+
+    /**
+     * Mark event as AI analyzed
+     */
+    public function markAsAiAnalyzed(array $result = []): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'completed',
+            'ai_analyzed_at' => now(),
+            'ai_analysis_result' => $result,
+            'ai_analysis_locked' => true,
+        ]);
+    }
+
+    /**
+     * Mark AI analysis as failed
+     */
+    public function markAiAnalysisFailed(string $error = null): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'failed',
+            'ai_analysis_result' => ['error' => $error],
+            'ai_analysis_locked' => false,
+        ]);
+    }
+
+    /**
+     * Reset AI analysis status
+     */
+    public function resetAiAnalysis(): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'pending',
+            'ai_analyzed_at' => null,
+            'ai_analysis_id' => null,
+            'ai_analysis_result' => null,
+            'ai_analysis_locked' => false,
+        ]);
+    }
+
+    /**
+     * Scope for events available for AI analysis
+     */
+    public function scopeAvailableForAiAnalysis($query)
+    {
+        return $query->where('ai_analysis_locked', false)
+                    ->whereIn('ai_analysis_status', ['pending', 'failed']);
+    }
+
+    /**
+     * Scope for AI analyzed events
+     */
+    public function scopeAiAnalyzed($query)
+    {
+        return $query->where('ai_analysis_status', 'completed');
+    }
+
+    /**
+     * Scope for events in AI analysis
+     */
+    public function scopeInAiAnalysis($query)
+    {
+        return $query->where('ai_analysis_status', 'in_progress');
     }
 }

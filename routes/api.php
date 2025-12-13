@@ -18,6 +18,9 @@ use App\Http\Controllers\Api\AdminCustomerReportingTemplateController;
 use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AdminUserManagementController;
 use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\AiAnalysisStatusController;
+use App\Http\Controllers\Api\UserStatisticsController;
+use App\Http\Controllers\Api\CsvTaskAiAnalysisController;
 use App\Http\Controllers\Api\OpenAITestController;
 use App\Http\Controllers\Api\AIScheduleController;
 use App\Http\Controllers\Api\AiAnalysisController;
@@ -243,6 +246,54 @@ Route::prefix('v1')->group(function () {
     // Public welcome screen routes (no authentication required)
     Route::get('welcome-screen', [WelcomeScreenController::class, 'getActiveScreen']);
     Route::post('welcome-screens', [WelcomeScreenController::class, 'store']);
+
+    // AI Analysis Status Management Routes
+    Route::prefix('ai-analysis')->group(function () {
+        // Get available tasks for AI analysis
+        Route::get('available-tasks', [AiAnalysisStatusController::class, 'getAvailableTasks']);
+        
+        // Mark tasks as being analyzed (lock them)
+        Route::post('mark-for-analysis', [AiAnalysisStatusController::class, 'markTasksForAnalysis']);
+        
+        // Update analysis results
+        Route::post('update-results', [AiAnalysisStatusController::class, 'updateAnalysisResults']);
+        
+        // Reset analysis status
+        Route::post('reset-status', [AiAnalysisStatusController::class, 'resetAnalysisStatus']);
+        
+        // Get analysis statistics
+        Route::get('statistics', [AiAnalysisStatusController::class, 'getAnalysisStatistics']);
+    });
+
+    // User Statistics Routes
+    Route::prefix('users/{userId}')->group(function () {
+        // Get comprehensive user statistics
+        Route::get('statistics', [UserStatisticsController::class, 'getUserStatistics']);
+        
+        // Get dashboard card stats (simplified version)
+        Route::get('dashboard-stats', [UserStatisticsController::class, 'getDashboardStats']);
+        
+        // Get reminder statistics
+        Route::get('reminder-stats', [UserStatisticsController::class, 'getReminderStatistics']);
+    });
+
+    // CSV Task AI Analysis Routes
+    Route::prefix('csv-tasks')->group(function () {
+        // Analyze selected CSV tasks with AI
+        Route::post('analyze', [CsvTaskAiAnalysisController::class, 'analyzeCsvTasks']);
+        
+        // Get analysis results
+        Route::get('analysis-results/{analysisId}', [CsvTaskAiAnalysisController::class, 'getAnalysisResults']);
+        
+        // Parse Vietnamese schedule format
+        Route::post('parse-vietnamese', [CsvTaskAiAnalysisController::class, 'parseVietnameseSchedule']);
+        
+        // Batch analyze multiple imports
+        Route::post('batch-analyze', [CsvTaskAiAnalysisController::class, 'batchAnalyzeImports']);
+        
+        // Get analysis status
+        Route::get('analysis-status', [CsvTaskAiAnalysisController::class, 'getAnalysisStatus']);
+    });
 
     // Admin feature highlights routes (authentication required)
     Route::prefix('feature-highlights')->group(function () {

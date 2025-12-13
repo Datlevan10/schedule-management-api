@@ -39,6 +39,14 @@ class RawScheduleEntryResource extends JsonResource
                 'meets_threshold' => $this->when($this->ai_confidence !== null, function () {
                     return $this->ai_confidence >= 0.7;
                 }),
+                'analysis_status' => $this->ai_analysis_status ?? 'pending',
+                'analyzed_at' => $this->ai_analyzed_at?->toIso8601String(),
+                'analysis_id' => $this->ai_analysis_id,
+                'analysis_result' => $this->ai_analysis_result,
+                'is_locked' => $this->ai_analysis_locked ?? false,
+                'is_available_for_analysis' => $this->when($this->ai_analysis_status !== null, function () {
+                    return $this->isAvailableForAiAnalysis();
+                }),
             ],
             'status' => [
                 'processing' => $this->processing_status,
