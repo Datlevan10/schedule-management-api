@@ -27,6 +27,11 @@ class RawScheduleEntry extends Model
         'ai_confidence',
         'ai_detected_category',
         'ai_detected_importance',
+        'ai_analysis_status',
+        'ai_analyzed_at',
+        'ai_analysis_id',
+        'ai_analysis_result',
+        'ai_analysis_locked',
         'processing_status',
         'conversion_status',
         'converted_event_id',
@@ -39,12 +44,15 @@ class RawScheduleEntry extends Model
         'original_data' => 'array',
         'detected_keywords' => 'array',
         'ai_parsed_data' => 'array',
+        'ai_analysis_result' => 'array',
         'parsing_errors' => 'array',
         'ai_confidence' => 'decimal:2',
         'ai_detected_importance' => 'decimal:2',
         'parsed_start_datetime' => 'datetime',
         'parsed_end_datetime' => 'datetime',
+        'ai_analyzed_at' => 'datetime',
         'manual_review_required' => 'boolean',
+        'ai_analysis_locked' => 'boolean',
     ];
 
     /**
@@ -189,5 +197,106 @@ class RawScheduleEntry extends Model
         }
         
         return $this->parsed_start_datetime->diffInMinutes($this->parsed_end_datetime);
+    }
+
+    /**
+     * Check if entry is available for AI analysis
+     */
+    public function isAvailableForAiAnalysis(): bool
+    {
+        return !$this->ai_analysis_locked && 
+               in_array($this->ai_analysis_status, ['pending', 'failed']);
+    }
+
+    /**
+     * Check if entry has been analyzed by AI
+     */
+    public function isAiAnalyzed(): bool
+    {
+        return $this->ai_analysis_status === 'completed';
+    }
+
+    /**
+     * Check if AI analysis is in progress
+     */
+    public function isAiAnalysisInProgress(): bool
+    {
+        return $this->ai_analysis_status === 'in_progress';
+    }
+
+    /**
+     * Mark entry as being analyzed by AI
+     */
+    public function markAsAiAnalysisInProgress(string $analysisId = null): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'in_progress',
+            'ai_analysis_id' => $analysisId,
+            'ai_analysis_locked' => true,
+        ]);
+    }
+
+    /**
+     * Mark entry as AI analyzed
+     */
+    public function markAsAiAnalyzed(array $result = []): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'completed',
+            'ai_analyzed_at' => now(),
+            'ai_analysis_result' => $result,
+            'ai_analysis_locked' => true,
+        ]);
+    }
+
+    /**
+     * Mark AI analysis as failed
+     */
+    public function markAiAnalysisFailed(string $error = null): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'failed',
+            'ai_analysis_result' => ['error' => $error],
+            'ai_analysis_locked' => false,
+        ]);
+    }
+
+    /**
+     * Reset AI analysis status
+     */
+    public function resetAiAnalysis(): void
+    {
+        $this->update([
+            'ai_analysis_status' => 'pending',
+            'ai_analyzed_at' => null,
+            'ai_analysis_id' => null,
+            'ai_analysis_result' => null,
+            'ai_analysis_locked' => false,
+        ]);
+    }
+
+    /**
+     * Scope for entries available for AI analysis
+     */
+    public function scopeAvailableForAiAnalysis($query)
+    {
+        return $query->where('ai_analysis_locked', false)
+                    ->whereIn('ai_analysis_status', ['pending', 'failed']);
+    }
+
+    /**
+     * Scope for AI analyzed entries
+     */
+    public function scopeAiAnalyzed($query)
+    {
+        return $query->where('ai_analysis_status', 'completed');
+    }
+
+    /**
+     * Scope for entries in AI analysis
+     */
+    public function scopeInAiAnalysis($query)
+    {
+        return $query->where('ai_analysis_status', 'in_progress');
     }
 }
