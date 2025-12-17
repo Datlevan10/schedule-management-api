@@ -304,8 +304,8 @@ class AIScheduleController extends Controller
     public function analyzeUserSchedule(Request $request, $userId): JsonResponse
     {
         try {
-            $apiKey = env('OPENAI_API_KEY');
-            $model = env('OPENAI_MODEL', 'gpt-4o-mini');
+            $apiKey = config('openai.api_key');
+            $model = config('openai.model', 'gpt-4o-mini');
 
             if (!$apiKey) {
                 return response()->json([
@@ -451,8 +451,8 @@ class AIScheduleController extends Controller
                 'additional_context' => 'nullable|string'
             ]);
 
-            $apiKey = env('OPENAI_API_KEY');
-            $model = env('OPENAI_MODEL', 'gpt-4o-mini');
+            $apiKey = config('openai.api_key');
+            $model = config('openai.model', 'gpt-4o-mini');
 
             if (!$apiKey) {
                 return response()->json([
