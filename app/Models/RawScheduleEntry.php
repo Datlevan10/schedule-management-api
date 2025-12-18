@@ -22,6 +22,9 @@ class RawScheduleEntry extends Model
         'parsed_end_datetime',
         'parsed_location',
         'parsed_priority',
+        'parsed_participants',
+        'parsed_requirements',
+        'parsed_duration_minutes',
         'detected_keywords',
         'ai_parsed_data',
         'ai_confidence',
@@ -43,6 +46,7 @@ class RawScheduleEntry extends Model
     protected $casts = [
         'original_data' => 'array',
         'detected_keywords' => 'array',
+        'parsed_participants' => 'array',
         'ai_parsed_data' => 'array',
         'ai_analysis_result' => 'array',
         'parsing_errors' => 'array',
@@ -53,6 +57,7 @@ class RawScheduleEntry extends Model
         'ai_analyzed_at' => 'datetime',
         'manual_review_required' => 'boolean',
         'ai_analysis_locked' => 'boolean',
+        'parsed_duration_minutes' => 'integer',
     ];
 
     /**

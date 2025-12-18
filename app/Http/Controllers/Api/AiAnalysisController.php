@@ -711,8 +711,33 @@ class AiAnalysisController extends Controller
         $tasks = [];
         $priorityRanking = [];
 
-        // Check if we have optimized schedule with parsed tasks
-        if ($analysis->optimized_schedule && isset($analysis->optimized_schedule['schedule'])) {
+        // First, try to get the actual raw schedule entries from the database
+        // This ensures we get the correctly parsed data
+        if ($analysis->import_id) {
+            $entries = \App\Models\RawScheduleEntry::where('import_id', $analysis->import_id)
+                ->where('user_id', $analysis->user_id)
+                ->get();
+            
+            if ($entries->isNotEmpty()) {
+                $tasks = $entries->map(function($entry) {
+                    return [
+                        'id' => $entry->id,
+                        'task_id' => 'csv_' . $entry->id,
+                        'title' => $entry->parsed_title ?: 'Untitled',
+                        'description' => $entry->parsed_description ?: '',
+                        'priority' => $entry->parsed_priority ?: 3,
+                        'start_datetime' => $entry->parsed_start_datetime ? $entry->parsed_start_datetime->toISOString() : null,
+                        'end_datetime' => $entry->parsed_end_datetime ? $entry->parsed_end_datetime->toISOString() : null,
+                        'location' => $entry->parsed_location ?: '',
+                        'confidence' => $entry->ai_confidence ?: 0,
+                        'original_data' => $entry->original_data
+                    ];
+                })->sortByDesc('priority')->values()->toArray();
+            }
+        }
+        
+        // Fallback to optimized schedule if available
+        elseif ($analysis->optimized_schedule && isset($analysis->optimized_schedule['schedule'])) {
             $scheduledTasks = collect($analysis->optimized_schedule['schedule']);
             
             $tasks = $scheduledTasks->map(function($task) {
@@ -741,8 +766,8 @@ class AiAnalysisController extends Controller
                     'title' => $task['parsed_data']['title'] ?? $task['original_data']['mon_hoc'] ?? 'Untitled',
                     'description' => $task['parsed_data']['description'] ?? $task['original_data']['ghi_chu'] ?? '',
                     'priority' => $task['parsed_data']['priority'] ?? 3,
-                    'start_datetime' => $task['parsed_data']['start_time'] ?? null,
-                    'end_datetime' => $task['parsed_data']['end_time'] ?? null,
+                    'start_datetime' => $task['parsed_data']['start_time'] ?? $task['parsed_data']['start_datetime'] ?? null,
+                    'end_datetime' => $task['parsed_data']['end_time'] ?? $task['parsed_data']['end_datetime'] ?? null,
                     'location' => $task['parsed_data']['location'] ?? $task['original_data']['phong'] ?? null,
                     'confidence' => $task['current_confidence'] ?? 0,
                     'original_data' => $task['original_data'] ?? null
