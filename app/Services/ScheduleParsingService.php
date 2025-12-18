@@ -290,32 +290,70 @@ class ScheduleParsingService
         // Convert keys to lowercase for case-insensitive matching
         $lowerData = array_change_key_case($data, CASE_LOWER);
 
-        // Try to extract common fields (check both original case and lowercase)
+        // Try to extract common fields - support both English and Vietnamese column names
         $entry->parsed_title = $data['Title'] ?? $data['title'] ?? $lowerData['title'] ?? 
+                               $data['﻿Tiêu đề nhiệm vụ'] ?? $data['Tiêu đề nhiệm vụ'] ?? 
                                $data['event'] ?? $lowerData['event'] ?? 
                                $data['subject'] ?? $lowerData['subject'] ?? null;
         
         $entry->parsed_description = $data['Description'] ?? $data['description'] ?? $lowerData['description'] ?? 
+                                     $data['Mô tả'] ?? $data['Mo ta'] ??
                                      $data['notes'] ?? $lowerData['notes'] ?? 
                                      $data['details'] ?? $lowerData['details'] ?? null;
         
         $entry->parsed_location = $data['Location'] ?? $data['location'] ?? $lowerData['location'] ?? 
+                                  $data['Địa điểm'] ?? $data['Dia diem'] ??
                                   $data['venue'] ?? $lowerData['venue'] ?? 
                                   $data['place'] ?? $lowerData['place'] ?? null;
         
-        // Parse dates - check various field name combinations
+        // Parse dates - check various field name combinations including Vietnamese
         $startDateField = $data['Start Date'] ?? $data['start_date'] ?? $lowerData['start date'] ?? 
                          $data['StartDate'] ?? $lowerData['startdate'] ?? 
+                         $data['Ngay_thang_nam'] ?? $data['Ngày tháng năm'] ??
                          $data['date'] ?? $lowerData['date'] ?? 
                          $data['datetime'] ?? $lowerData['datetime'] ?? null;
         
+        $timeField = $data['Time'] ?? $data['time'] ?? $data['Gio'] ?? $data['Giờ'] ?? 
+                     $lowerData['time'] ?? $lowerData['gio'] ?? null;
+        
         if ($startDateField) {
             try {
-                $entry->parsed_start_datetime = Carbon::parse($startDateField);
+                // Handle Vietnamese date format (DD/MM/YYYY)
+                if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $startDateField)) {
+                    // Parse DD/MM/YYYY format
+                    $dateParts = explode('/', $startDateField);
+                    $formattedDate = $dateParts[2] . '-' . str_pad($dateParts[1], 2, '0', STR_PAD_LEFT) . '-' . str_pad($dateParts[0], 2, '0', STR_PAD_LEFT);
+                    
+                    // Combine date and time if both exist
+                    if ($timeField) {
+                        $dateTimeStr = $formattedDate . ' ' . $timeField;
+                        $entry->parsed_start_datetime = Carbon::parse($dateTimeStr);
+                        // Calculate end time (default 1 hour duration)
+                        $entry->parsed_end_datetime = Carbon::parse($dateTimeStr)->addHour();
+                    } else {
+                        $entry->parsed_start_datetime = Carbon::parse($formattedDate);
+                    }
+                } else {
+                    // Try standard parsing for other formats
+                    if ($timeField) {
+                        $dateTimeStr = $startDateField . ' ' . $timeField;
+                        $entry->parsed_start_datetime = Carbon::parse($dateTimeStr);
+                        // Calculate end time (default 1 hour duration)
+                        $entry->parsed_end_datetime = Carbon::parse($dateTimeStr)->addHour();
+                    } else {
+                        $entry->parsed_start_datetime = Carbon::parse($startDateField);
+                    }
+                }
+                
+                // Calculate duration if both start and end times exist
+                if ($entry->parsed_start_datetime && $entry->parsed_end_datetime) {
+                    $entry->parsed_duration_minutes = $entry->parsed_start_datetime->diffInMinutes($entry->parsed_end_datetime);
+                }
             } catch (\Exception $e) {
                 // Date parsing failed
                 Log::warning('Failed to parse start date', [
                     'value' => $startDateField,
+                    'time' => $timeField,
                     'error' => $e->getMessage()
                 ]);
             }
@@ -325,7 +363,7 @@ class ScheduleParsingService
                        $data['EndDate'] ?? $lowerData['enddate'] ?? 
                        $data['end_time'] ?? $lowerData['end_time'] ?? null;
         
-        if ($endDateField) {
+        if ($endDateField && !$entry->parsed_end_datetime) {
             try {
                 $entry->parsed_end_datetime = Carbon::parse($endDateField);
             } catch (\Exception $e) {
@@ -337,12 +375,46 @@ class ScheduleParsingService
             }
         }
 
-        // Set priority - check various field names
+        // Parse participants (Vietnamese: Người tham gia)
+        $participantsField = $data['Participants'] ?? $data['participants'] ?? 
+                            $data['Người tham gia'] ?? $data['Nguoi tham gia'] ?? null;
+        if ($participantsField) {
+            $entry->parsed_participants = is_array($participantsField) ? $participantsField : explode(',', $participantsField);
+        }
+
+        // Parse requirements (Vietnamese: Yêu cầu cần thiết)
+        $requirementsField = $data['Requirements'] ?? $data['requirements'] ?? 
+                            $data['Yêu cầu cần thiết'] ?? $data['Yeu cau can thiet'] ?? null;
+        if ($requirementsField) {
+            $entry->parsed_requirements = $requirementsField;
+        }
+
+        // Set priority - check various field names including Vietnamese
         $priorityField = $data['Priority'] ?? $data['priority'] ?? $lowerData['priority'] ?? 
+                        $data['Mức độ ưu tiên'] ?? $data['Muc do uu tien'] ??
                         $data['importance'] ?? $lowerData['importance'] ?? null;
         
         if ($priorityField !== null) {
-            $entry->parsed_priority = intval($priorityField);
+            // Map Vietnamese priority levels to numeric values
+            $priorityMap = [
+                'Khẩn cấp' => 5,
+                'Khan cap' => 5,
+                'Rất cao' => 5,
+                'Rat cao' => 5,
+                'Cao' => 4,
+                'Trung bình' => 3,
+                'Trung binh' => 3,
+                'Thấp' => 2,
+                'Thap' => 2,
+                'Rất thấp' => 1,
+                'Rat thap' => 1
+            ];
+            
+            if (is_string($priorityField) && isset($priorityMap[$priorityField])) {
+                $entry->parsed_priority = $priorityMap[$priorityField];
+            } else {
+                $entry->parsed_priority = intval($priorityField);
+            }
         } else {
             $entry->parsed_priority = $preferences->default_priority ?? 3;
         }
