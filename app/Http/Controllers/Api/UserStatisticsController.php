@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\RawScheduleEntry;
 use App\Models\User;
+use App\Models\SmartNotification;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -37,15 +38,24 @@ class UserStatisticsController extends Controller
             ->count();
         $totalTasks = $totalEvents + $totalEntries;
         
-        // 2. Active Tasks (scheduled, not completed)
+        // 2. Active Tasks: AI-analyzed tasks that are not completed or failed
+        // Manual tasks (Events) that have been AI-analyzed and are active
         $activeEvents = Event::where('user_id', $userId)
-            ->where('status', 'scheduled')
-            ->where('start_datetime', '>=', $now)
+            ->where('ai_analysis_status', 'completed')  // Must be AI-analyzed
+            ->whereNotIn('status', ['completed', 'cancelled', 'failed'])  // Not completed/failed
             ->count();
             
+        // CSV-imported tasks (RawScheduleEntries) that have been AI-analyzed and are active
         $activeEntries = RawScheduleEntry::where('user_id', $userId)
-            ->where('conversion_status', '!=', 'success')
-            ->where('processing_status', '!=', 'failed')
+            ->where('ai_analysis_status', 'completed')  // Must be AI-analyzed
+            ->where(function($query) {
+                $query->where('processing_status', '!=', 'failed')
+                    ->where(function($q) {
+                        $q->whereNull('conversion_status')
+                          ->orWhere('conversion_status', '!=', 'failed');
+                    });
+            })
+            ->whereNull('converted_event_id')  // Not yet converted to an event
             ->count();
             
         $activeTasks = $activeEvents + $activeEntries;
@@ -62,18 +72,18 @@ class UserStatisticsController extends Controller
         $analyzedTasks = $analyzedEvents + $analyzedEntries;
         
         // 4. Tasks with Reminders
-        $tasksWithReminders = Event::where('user_id', $userId)
-            ->whereNotNull('reminder_minutes')
-            ->where('reminder_minutes', '>', 0)
-            ->count();
+        $tasksWithReminders = SmartNotification::where('user_id', $userId)
+            ->where('type', 'reminder')
+            ->whereNotNull('event_id')
+            ->distinct('event_id')
+            ->count('event_id');
         
-        // 5. Pending Reminders (upcoming events with reminders)
-        $pendingReminders = Event::where('user_id', $userId)
-            ->whereNotNull('reminder_minutes')
-            ->where('reminder_minutes', '>', 0)
-            ->where('status', 'scheduled')
-            ->where('start_datetime', '>=', $now)
-            ->where('start_datetime', '<=', $now->copy()->addDays(7))
+        // 5. Pending Reminders (upcoming reminders)
+        $pendingReminders = SmartNotification::where('user_id', $userId)
+            ->where('type', 'reminder')
+            ->where('status', 'pending')
+            ->where('trigger_datetime', '>=', $now)
+            ->where('trigger_datetime', '<=', $now->copy()->addDays(7))
             ->count();
         
         // 6. Calculate Productivity Score
@@ -139,18 +149,38 @@ class UserStatisticsController extends Controller
         $user = User::findOrFail($userId);
         $now = Carbon::now();
         
-        // Active Tasks
-        $activeTasks = Event::where('user_id', $userId)
-            ->where('status', 'scheduled')
-            ->where('start_datetime', '>=', $now)
+        // Active Tasks: Count all AI-analyzed tasks (manual + CSV) that are not completed or failed
+        // 1. Manual tasks (Events) that have been AI-analyzed and are active
+        $activeManualTasks = Event::where('user_id', $userId)
+            ->where('ai_analysis_status', 'completed')  // Must be AI-analyzed
+            ->whereNotIn('status', ['completed', 'cancelled', 'failed'])  // Not completed/failed
             ->count();
         
-        // Pending Reminders
-        $reminders = Event::where('user_id', $userId)
-            ->whereNotNull('reminder_minutes')
-            ->where('status', 'scheduled')
-            ->where('start_datetime', '>=', $now)
-            ->where('start_datetime', '<=', $now->copy()->addDays(7))
+        // 2. CSV-imported tasks (RawScheduleEntries) that have been AI-analyzed and are active
+        $activeCsvTasks = RawScheduleEntry::where('user_id', $userId)
+            ->where('ai_analysis_status', 'completed')  // Must be AI-analyzed
+            ->where(function($query) {
+                // Include entries that are not failed and either:
+                // - Not yet converted (conversion_status != 'success')
+                // - Successfully parsed but pending further action
+                $query->where('processing_status', '!=', 'failed')
+                    ->where(function($q) {
+                        $q->whereNull('conversion_status')
+                          ->orWhere('conversion_status', '!=', 'failed');
+                    });
+            })
+            ->whereNull('converted_event_id')  // Not yet converted to an event (to avoid double counting)
+            ->count();
+        
+        // Total active tasks
+        $activeTasks = $activeManualTasks + $activeCsvTasks;
+        
+        // Pending Reminders from smart_notifications table
+        $reminders = SmartNotification::where('user_id', $userId)
+            ->where('type', 'reminder')
+            ->where('status', 'pending')
+            ->where('trigger_datetime', '>=', $now)
+            ->where('trigger_datetime', '<=', $now->copy()->addDays(7))
             ->count();
         
         // Productivity Score
@@ -309,16 +339,15 @@ class UserStatisticsController extends Controller
      */
     private function calculateReminderFrequency($userId, Carbon $startOfYear, Carbon $endOfYear): array
     {
-        // Get all events with reminders for the year
-        $eventsWithReminders = Event::where('user_id', $userId)
-            ->whereNotNull('reminder_minutes')
-            ->where('reminder_minutes', '>', 0)
-            ->whereBetween('start_datetime', [$startOfYear, $endOfYear])
+        // Get all reminders for the year
+        $remindersInYear = SmartNotification::where('user_id', $userId)
+            ->where('type', 'reminder')
+            ->whereBetween('trigger_datetime', [$startOfYear, $endOfYear])
             ->get();
         
         // Count unique days with reminders
-        $daysWithReminders = $eventsWithReminders
-            ->pluck('start_datetime')
+        $daysWithReminders = $remindersInYear
+            ->pluck('trigger_datetime')
             ->map(function ($date) {
                 return Carbon::parse($date)->format('Y-m-d');
             })
@@ -336,10 +365,10 @@ class UserStatisticsController extends Controller
         
         return [
             'percentage' => $percentage,
-            'total' => $eventsWithReminders->count(),
+            'total' => $remindersInYear->count(),
             'days_with_reminders' => $daysWithReminders,
             'average_per_day' => $daysWithReminders > 0 
-                ? round($eventsWithReminders->count() / $daysWithReminders, 1)
+                ? round($remindersInYear->count() / $daysWithReminders, 1)
                 : 0,
         ];
     }
@@ -439,26 +468,25 @@ class UserStatisticsController extends Controller
                 $endDate = $baseDate->copy()->endOfWeek();
         }
         
-        // Get events with reminders in the period
-        $eventsWithReminders = Event::where('user_id', $userId)
-            ->whereNotNull('reminder_minutes')
-            ->whereBetween('start_datetime', [$startDate, $endDate])
+        // Get reminders in the period
+        $remindersInPeriod = SmartNotification::where('user_id', $userId)
+            ->where('type', 'reminder')
+            ->whereBetween('trigger_datetime', [$startDate, $endDate])
             ->get();
         
         // Calculate statistics
-        $totalReminders = $eventsWithReminders->count();
-        $upcomingReminders = $eventsWithReminders
-            ->where('start_datetime', '>=', Carbon::now())
-            ->where('status', 'scheduled')
+        $totalReminders = $remindersInPeriod->count();
+        $upcomingReminders = $remindersInPeriod
+            ->where('trigger_datetime', '>=', Carbon::now())
+            ->where('status', 'pending')
             ->count();
         
-        // Group by reminder time
-        $reminderTimes = $eventsWithReminders
-            ->groupBy('reminder_minutes')
-            ->map(function ($group, $minutes) {
+        // Group by subtype or priority
+        $reminderTypes = $remindersInPeriod
+            ->groupBy('subtype')
+            ->map(function ($group, $subtype) {
                 return [
-                    'minutes' => $minutes,
-                    'label' => $this->formatReminderTime($minutes),
+                    'type' => $subtype ?: 'standard',
                     'count' => $group->count(),
                 ];
             })
@@ -473,7 +501,7 @@ class UserStatisticsController extends Controller
                 'total_reminders' => $totalReminders,
                 'upcoming_reminders' => $upcomingReminders,
                 'past_reminders' => $totalReminders - $upcomingReminders,
-                'reminder_distribution' => $reminderTimes,
+                'reminder_distribution' => $reminderTypes,
                 'daily_average' => round($totalReminders / max($startDate->diffInDays($endDate), 1), 1),
             ]
         ]);
